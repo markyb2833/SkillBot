@@ -10,7 +10,7 @@ from config import COLORS, CURRENCY_NAME, DAILY_REWARD, STARTING_BALANCE
 class Economy(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
-        self.data_file = 'data/economy.json'
+        self.data_file = '/data/economy.json'
         self.users = self.load_users()
 
     def load_users(self):
@@ -626,6 +626,124 @@ class Economy(commands.Cog):
         final_embed.add_field(name="New Balance", value=f"{user_data['balance']:,} {CURRENCY_NAME}", inline=False)
         
         await ctx.send(embed=final_embed)
+
+    @commands.command(name='slots', aliases=['slot'])
+    async def slot_machine(self, ctx, amount: str):
+        """Play the slot machine! Usage: !slots <amount>"""
+        user_data = self.get_user_data(ctx.author.id)
+        
+        # Parse amount
+        if amount.lower() == 'all':
+            bet_amount = user_data['balance']
+        elif amount.lower() == 'half':
+            bet_amount = user_data['balance'] // 2
+        else:
+            try:
+                bet_amount = int(amount)
+            except ValueError:
+                await ctx.send("❌ Invalid amount! Use a number, 'all', or 'half'")
+                return
+        
+        if bet_amount <= 0:
+            await ctx.send("❌ You need to bet a positive amount!")
+            return
+        
+        if bet_amount > user_data['balance']:
+            await ctx.send(f"❌ You don't have enough {CURRENCY_NAME}! Your balance: {user_data['balance']:,}")
+            return
+        
+        # Slot machine symbols and their values
+        symbols = ['🍒', '🍋', '🍊', '🍇', '🔔', '💎', '7️⃣']
+        
+        # Create initial spinning embed
+        embed = discord.Embed(
+            title="🎰 Slot Machine",
+            description="```\n🎰 | 🔄 🔄 🔄 |\n```",
+            color=COLORS['primary']
+        )
+        embed.add_field(name="Bet", value=f"{bet_amount:,} {CURRENCY_NAME}", inline=True)
+        embed.add_field(name="Status", value="🎲 Spinning...", inline=True)
+        
+        message = await ctx.send(embed=embed)
+        
+        # Animation frames - gradually slow down
+        animation_delays = [0.3, 0.4, 0.5, 0.6, 0.8, 1.0]
+        
+        # Generate final result first
+        final_result = [random.choice(symbols) for _ in range(3)]
+        
+        # Animate the spinning
+        for i, delay in enumerate(animation_delays):
+            # Show random symbols during animation
+            if i < len(animation_delays) - 1:
+                current_symbols = [random.choice(symbols) for _ in range(3)]
+            else:
+                current_symbols = final_result
+            
+            embed.description = f"```\n🎰 | {' '.join(current_symbols)} |\n```"
+            await message.edit(embed=embed)
+            await asyncio.sleep(delay)
+        
+        # Calculate winnings
+        result1, result2, result3 = final_result
+        
+        # Check for wins
+        if result1 == result2 == result3:
+            # Three of a kind
+            if result1 == '💎':
+                multiplier = 10  # Diamond jackpot
+                result_text = "💎 DIAMOND JACKPOT! 💎"
+            elif result1 == '7️⃣':
+                multiplier = 8   # Lucky sevens
+                result_text = "🍀 LUCKY SEVENS! 🍀"
+            elif result1 == '🔔':
+                multiplier = 5   # Bells
+                result_text = "🔔 TRIPLE BELLS! 🔔"
+            else:
+                multiplier = 3   # Other triples
+                result_text = f"🎉 TRIPLE {result1}! 🎉"
+            
+            winnings = bet_amount * multiplier
+            self.update_balance(ctx.author.id, winnings - bet_amount)
+            user_data['gambling_wins'] += 1
+            color = COLORS['success']
+            
+        elif result1 == result2 or result2 == result3 or result1 == result3:
+            # Two of a kind
+            multiplier = 2
+            winnings = bet_amount * multiplier
+            self.update_balance(ctx.author.id, winnings - bet_amount)
+            user_data['gambling_wins'] += 1
+            result_text = "🎊 DOUBLE MATCH! 🎊"
+            color = COLORS['success']
+            
+        else:
+            # No match - loss
+            winnings = 0
+            self.update_balance(ctx.author.id, -bet_amount)
+            user_data['gambling_losses'] += 1
+            result_text = "💸 No Match"
+            color = COLORS['error']
+        
+        self.save_users()
+        
+        # Final result embed
+        final_embed = discord.Embed(
+            title="🎰 Slot Machine Results",
+            description=f"```\n🎰 | {' '.join(final_result)} |\n```",
+            color=color
+        )
+        final_embed.add_field(name="Result", value=result_text, inline=False)
+        
+        if winnings > 0:
+            profit = winnings - bet_amount
+            final_embed.add_field(name="Winnings", value=f"+{profit:,} {CURRENCY_NAME} ({multiplier}x)", inline=True)
+        else:
+            final_embed.add_field(name="Loss", value=f"-{bet_amount:,} {CURRENCY_NAME}", inline=True)
+        
+        final_embed.add_field(name="New Balance", value=f"{user_data['balance']:,} {CURRENCY_NAME}", inline=True)
+        
+        await message.edit(embed=final_embed)
 
 async def setup(bot):
     await bot.add_cog(Economy(bot))

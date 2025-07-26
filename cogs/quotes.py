@@ -8,7 +8,7 @@ from config import COLORS
 class Quotes(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
-        self.data_file = 'data/quotes.json'
+        self.data_file = '/data/quotes.json'
         self.quotes = self.load_quotes()
 
     def load_quotes(self):
