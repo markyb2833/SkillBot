@@ -655,14 +655,44 @@ class Economy(commands.Cog):
         # Slot machine symbols and their values
         symbols = ['🍒', '🍋', '🍊', '🍇', '🔔', '💎', '7️⃣']
         
+        # Pay table
+        pay_table = (
+            "**💰 PAY TABLE 💰**\n"
+            "💎 💎 💎 = 100x\n"
+            "7️⃣ 7️⃣ 7️⃣ = 50x\n"
+            "🔔 🔔 🔔 = 25x\n"
+            "🍇 🍇 🍇 = 15x\n"
+            "🍊 🍊 🍊 = 10x\n"
+            "🍋 🍋 🍋 = 8x\n"
+            "🍒 🍒 🍒 = 5x\n"
+            "Any 2 Match = 2x"
+        )
+        
+        # Generate 3x3 grid (only middle row counts)
+        def generate_grid():
+            return [[random.choice(symbols) for _ in range(3)] for _ in range(3)]
+        
+        def format_grid(grid):
+            return (
+                f"```\n"
+                f"┌─────────────┐\n"
+                f"│ {' '.join(grid[0])} │\n"
+                f"│>{' '.join(grid[1])}<│ ← PAYLINE\n"
+                f"│ {' '.join(grid[2])} │\n"
+                f"└─────────────┘\n"
+                f"```"
+            )
+        
         # Create initial spinning embed
+        spinning_grid = [['🔄', '🔄', '🔄'] for _ in range(3)]
         embed = discord.Embed(
-            title="🎰 Slot Machine",
-            description="```\n🎰 | 🔄 🔄 🔄 |\n```",
+            title="🎰 Classic Slot Machine",
+            description=format_grid(spinning_grid),
             color=COLORS['primary']
         )
         embed.add_field(name="Bet", value=f"{bet_amount:,} {CURRENCY_NAME}", inline=True)
         embed.add_field(name="Status", value="🎲 Spinning...", inline=True)
+        embed.add_field(name="Pay Table", value=pay_table, inline=False)
         
         message = await ctx.send(embed=embed)
         
@@ -670,38 +700,49 @@ class Economy(commands.Cog):
         animation_delays = [0.3, 0.4, 0.5, 0.6, 0.8, 1.0]
         
         # Generate final result first
-        final_result = [random.choice(symbols) for _ in range(3)]
+        final_grid = generate_grid()
         
         # Animate the spinning
         for i, delay in enumerate(animation_delays):
             # Show random symbols during animation
             if i < len(animation_delays) - 1:
-                current_symbols = [random.choice(symbols) for _ in range(3)]
+                current_grid = generate_grid()
             else:
-                current_symbols = final_result
+                current_grid = final_grid
             
-            embed.description = f"```\n🎰 | {' '.join(current_symbols)} |\n```"
+            embed.description = format_grid(current_grid)
+            embed.set_field_at(1, name="Status", value="🎲 Spinning..." if i < len(animation_delays) - 1 else "🎯 Final Result!", inline=True)
             await message.edit(embed=embed)
             await asyncio.sleep(delay)
         
-        # Calculate winnings
-        result1, result2, result3 = final_result
+        # Only the middle row (payline) counts for wins
+        payline = final_grid[1]  # Middle row
+        result1, result2, result3 = payline
         
-        # Check for wins
+        # Check for wins based on payline only
         if result1 == result2 == result3:
-            # Three of a kind
+            # Three of a kind on payline
             if result1 == '💎':
-                multiplier = 10  # Diamond jackpot
+                multiplier = 100  # Diamond jackpot
                 result_text = "💎 DIAMOND JACKPOT! 💎"
             elif result1 == '7️⃣':
-                multiplier = 8   # Lucky sevens
+                multiplier = 50   # Lucky sevens
                 result_text = "🍀 LUCKY SEVENS! 🍀"
             elif result1 == '🔔':
-                multiplier = 5   # Bells
+                multiplier = 25   # Bells
                 result_text = "🔔 TRIPLE BELLS! 🔔"
-            else:
-                multiplier = 3   # Other triples
-                result_text = f"🎉 TRIPLE {result1}! 🎉"
+            elif result1 == '🍇':
+                multiplier = 15   # Grapes
+                result_text = "🍇 TRIPLE GRAPES! 🍇"
+            elif result1 == '🍊':
+                multiplier = 10   # Oranges
+                result_text = "🍊 TRIPLE ORANGES! 🍊"
+            elif result1 == '🍋':
+                multiplier = 8    # Lemons
+                result_text = "🍋 TRIPLE LEMONS! 🍋"
+            elif result1 == '🍒':
+                multiplier = 5    # Cherries
+                result_text = "🍒 TRIPLE CHERRIES! 🍒"
             
             winnings = bet_amount * multiplier
             self.update_balance(ctx.author.id, winnings - bet_amount)
@@ -709,7 +750,7 @@ class Economy(commands.Cog):
             color = COLORS['success']
             
         elif result1 == result2 or result2 == result3 or result1 == result3:
-            # Two of a kind
+            # Two of a kind on payline
             multiplier = 2
             winnings = bet_amount * multiplier
             self.update_balance(ctx.author.id, winnings - bet_amount)
@@ -720,6 +761,7 @@ class Economy(commands.Cog):
         else:
             # No match - loss
             winnings = 0
+            multiplier = 0
             self.update_balance(ctx.author.id, -bet_amount)
             user_data['gambling_losses'] += 1
             result_text = "💸 No Match"
@@ -730,10 +772,11 @@ class Economy(commands.Cog):
         # Final result embed
         final_embed = discord.Embed(
             title="🎰 Slot Machine Results",
-            description=f"```\n🎰 | {' '.join(final_result)} |\n```",
+            description=format_grid(final_grid),
             color=color
         )
-        final_embed.add_field(name="Result", value=result_text, inline=False)
+        final_embed.add_field(name="Payline Result", value=f"{' '.join(payline)}", inline=True)
+        final_embed.add_field(name="Result", value=result_text, inline=True)
         
         if winnings > 0:
             profit = winnings - bet_amount
@@ -742,6 +785,7 @@ class Economy(commands.Cog):
             final_embed.add_field(name="Loss", value=f"-{bet_amount:,} {CURRENCY_NAME}", inline=True)
         
         final_embed.add_field(name="New Balance", value=f"{user_data['balance']:,} {CURRENCY_NAME}", inline=True)
+        final_embed.add_field(name="Pay Table", value=pay_table, inline=False)
         
         await message.edit(embed=final_embed)
 
