@@ -3,6 +3,7 @@ from discord.ext import commands
 import json
 import os
 import random
+import asyncio
 from datetime import datetime, timedelta
 from config import COLORS, CURRENCY_NAME, DAILY_REWARD, STARTING_BALANCE
 
@@ -543,7 +544,7 @@ class Economy(commands.Cog):
         # Player hits/stands
         while player_value < 21:
             try:
-                reaction, user = await self.bot.wait_for('reaction_add', timeout=30, check=check)
+                reaction, user = await self.bot.wait_for('reaction_add', timeout=120, check=check)
                 
                 if str(reaction.emoji) == '👊':  # Hit
                     player_hand.append(deck.pop())
