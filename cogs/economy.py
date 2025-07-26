@@ -687,9 +687,8 @@ class Economy(commands.Cog):
                 f"```"
             )
         
-        # Create initial spinning embed with spinning symbols
-        spinning_symbols = ['🌀', '💫', '⚡', '🔄', '✨']
-        spinning_grid = [[random.choice(spinning_symbols) for _ in range(3)] for _ in range(3)]
+        # Create initial spinning embed with actual slot symbols
+        spinning_grid = generate_grid()
         
         embed = discord.Embed(
             title="🎰 ═══ CLASSIC SLOT MACHINE ═══ 🎰",
@@ -702,12 +701,12 @@ class Economy(commands.Cog):
         
         message = await ctx.send(embed=embed)
         
-        # Animation frames - gradually slow down with different effects
+        # Animation frames - gradually slow down
         animation_delays = [0.2, 0.3, 0.4, 0.5, 0.7, 0.9, 1.2]
         status_messages = [
             "**🌪️ SPINNING FAST...**",
             "**🔄 SPINNING...**", 
-            "**💫 SLOWING DOWN...**",
+            "**� SPLOWING DOWN...**",
             "**🎯 ALMOST THERE...**",
             "**⏳ FINAL SPIN...**",
             "**🔥 STOPPING...**",
@@ -717,22 +716,11 @@ class Economy(commands.Cog):
         # Generate final result first
         final_grid = generate_grid()
         
-        # Animate the spinning with different visual effects
+        # Animate the spinning with only actual slot symbols
         for i, delay in enumerate(animation_delays):
             if i < len(animation_delays) - 1:
-                # Create spinning effect with random symbols and spinning icons
-                current_grid = []
-                for row in range(3):
-                    if i < 3:  # Fast spinning phase
-                        current_grid.append([random.choice(spinning_symbols) for _ in range(3)])
-                    else:  # Slowing down phase - mix of real symbols and spinning
-                        row_symbols = []
-                        for col in range(3):
-                            if random.random() < 0.3:  # 30% chance of showing real symbol
-                                row_symbols.append(random.choice(symbols))
-                            else:
-                                row_symbols.append(random.choice(spinning_symbols))
-                        current_grid.append(row_symbols)
+                # Show random combinations of actual slot symbols during spinning
+                current_grid = generate_grid()
             else:
                 current_grid = final_grid
             
