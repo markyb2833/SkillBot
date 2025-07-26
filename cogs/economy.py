@@ -688,7 +688,7 @@ class Economy(commands.Cog):
             )
         
         # Create initial spinning embed with spinning symbols
-        spinning_symbols = ['🌀', '�', ''⚡', '🔄', '✨']
+        spinning_symbols = ['🌀', '💫', '⚡', '🔄', '✨']
         spinning_grid = [[random.choice(spinning_symbols) for _ in range(3)] for _ in range(3)]
         
         embed = discord.Embed(
@@ -706,7 +706,7 @@ class Economy(commands.Cog):
         animation_delays = [0.2, 0.3, 0.4, 0.5, 0.7, 0.9, 1.2]
         status_messages = [
             "**🌪️ SPINNING FAST...**",
-            "**⚡ SPINNING...**", 
+            "**🔄 SPINNING...**", 
             "**💫 SLOWING DOWN...**",
             "**🎯 ALMOST THERE...**",
             "**⏳ FINAL SPIN...**",
@@ -821,7 +821,7 @@ class Economy(commands.Cog):
             profit = winnings - bet_amount
             win_display = f"**+{profit:,} {CURRENCY_NAME}**\n({multiplier}x multiplier)"
             if multiplier >= 50:
-                win_display = f"🎊 **+{profit:,} {CURRENCY_NAME}** 🎊\n⚡ {multiplier}x MEGA WIN! ⚡"
+                win_display = f"🎊 **+{profit:,} {CURRENCY_NAME}** 🎊\n🔥 {multiplier}x MEGA WIN! 🔥"
             final_embed.add_field(name="💰 Winnings", value=win_display, inline=True)
         else:
             final_embed.add_field(name="💸 Loss", value=f"**-{bet_amount:,} {CURRENCY_NAME}**", inline=True)
