@@ -10,7 +10,7 @@ from config import COLORS, CURRENCY_NAME, DAILY_REWARD, STARTING_BALANCE
 class Economy(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
-        self.data_file = '/data/economy.json'
+        self.data_file = 'data/economy.json'
         self.users = self.load_users()
 
     def load_users(self):
