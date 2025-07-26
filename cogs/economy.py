@@ -675,43 +675,69 @@ class Economy(commands.Cog):
         def format_grid(grid):
             return (
                 f"```\n"
-                f"┌─────────────┐\n"
-                f"│ {' '.join(grid[0])} │\n"
-                f"│>{' '.join(grid[1])}<│ ← PAYLINE\n"
-                f"│ {' '.join(grid[2])} │\n"
-                f"└─────────────┘\n"
+                f"╔═══════════════════╗\n"
+                f"║                   ║\n"
+                f"║   {' '.join(grid[0])}   ║\n"
+                f"║                   ║\n"
+                f"║ ► {' '.join(grid[1])} ◄ ║ ← PAYLINE\n"
+                f"║                   ║\n"
+                f"║   {' '.join(grid[2])}   ║\n"
+                f"║                   ║\n"
+                f"╚═══════════════════╝\n"
                 f"```"
             )
         
-        # Create initial spinning embed
-        spinning_grid = [['🔄', '🔄', '🔄'] for _ in range(3)]
+        # Create initial spinning embed with spinning symbols
+        spinning_symbols = ['🌀', '�', ''⚡', '🔄', '✨']
+        spinning_grid = [[random.choice(spinning_symbols) for _ in range(3)] for _ in range(3)]
+        
         embed = discord.Embed(
-            title="🎰 Classic Slot Machine",
+            title="🎰 ═══ CLASSIC SLOT MACHINE ═══ 🎰",
             description=format_grid(spinning_grid),
             color=COLORS['primary']
         )
-        embed.add_field(name="Bet", value=f"{bet_amount:,} {CURRENCY_NAME}", inline=True)
-        embed.add_field(name="Status", value="🎲 Spinning...", inline=True)
+        embed.add_field(name="💰 Bet Amount", value=f"{bet_amount:,} {CURRENCY_NAME}", inline=True)
+        embed.add_field(name="🎲 Status", value="**SPINNING...**", inline=True)
         embed.add_field(name="Pay Table", value=pay_table, inline=False)
         
         message = await ctx.send(embed=embed)
         
-        # Animation frames - gradually slow down
-        animation_delays = [0.3, 0.4, 0.5, 0.6, 0.8, 1.0]
+        # Animation frames - gradually slow down with different effects
+        animation_delays = [0.2, 0.3, 0.4, 0.5, 0.7, 0.9, 1.2]
+        status_messages = [
+            "**🌪️ SPINNING FAST...**",
+            "**⚡ SPINNING...**", 
+            "**💫 SLOWING DOWN...**",
+            "**🎯 ALMOST THERE...**",
+            "**⏳ FINAL SPIN...**",
+            "**🔥 STOPPING...**",
+            "**✨ FINAL RESULT! ✨**"
+        ]
         
         # Generate final result first
         final_grid = generate_grid()
         
-        # Animate the spinning
+        # Animate the spinning with different visual effects
         for i, delay in enumerate(animation_delays):
-            # Show random symbols during animation
             if i < len(animation_delays) - 1:
-                current_grid = generate_grid()
+                # Create spinning effect with random symbols and spinning icons
+                current_grid = []
+                for row in range(3):
+                    if i < 3:  # Fast spinning phase
+                        current_grid.append([random.choice(spinning_symbols) for _ in range(3)])
+                    else:  # Slowing down phase - mix of real symbols and spinning
+                        row_symbols = []
+                        for col in range(3):
+                            if random.random() < 0.3:  # 30% chance of showing real symbol
+                                row_symbols.append(random.choice(symbols))
+                            else:
+                                row_symbols.append(random.choice(spinning_symbols))
+                        current_grid.append(row_symbols)
             else:
                 current_grid = final_grid
             
             embed.description = format_grid(current_grid)
-            embed.set_field_at(1, name="Status", value="🎲 Spinning..." if i < len(animation_delays) - 1 else "🎯 Final Result!", inline=True)
+            embed.set_field_at(1, name="🎲 Status", value=status_messages[i], inline=True)
             await message.edit(embed=embed)
             await asyncio.sleep(delay)
         
@@ -769,23 +795,45 @@ class Economy(commands.Cog):
         
         self.save_users()
         
-        # Final result embed
+        # Final result embed with enhanced presentation
+        if winnings > 0:
+            title = f"� ═ ══ WINNER! ═══ 🎉"
+            if multiplier >= 50:
+                title = f"🚨 ═══ MEGA WIN! ═══ 🚨"
+        else:
+            title = f"🎰 ═══ SLOT RESULTS ═══ 🎰"
+            
         final_embed = discord.Embed(
-            title="🎰 Slot Machine Results",
+            title=title,
             description=format_grid(final_grid),
             color=color
         )
-        final_embed.add_field(name="Payline Result", value=f"{' '.join(payline)}", inline=True)
-        final_embed.add_field(name="Result", value=result_text, inline=True)
+        
+        # Enhanced payline display
+        payline_display = f"**{' '.join(payline)}**"
+        if winnings > 0:
+            payline_display = f"🔥 **{' '.join(payline)}** 🔥"
+            
+        final_embed.add_field(name="🎯 Payline Result", value=payline_display, inline=True)
+        final_embed.add_field(name="🏆 Result", value=result_text, inline=True)
         
         if winnings > 0:
             profit = winnings - bet_amount
-            final_embed.add_field(name="Winnings", value=f"+{profit:,} {CURRENCY_NAME} ({multiplier}x)", inline=True)
+            win_display = f"**+{profit:,} {CURRENCY_NAME}**\n({multiplier}x multiplier)"
+            if multiplier >= 50:
+                win_display = f"🎊 **+{profit:,} {CURRENCY_NAME}** 🎊\n⚡ {multiplier}x MEGA WIN! ⚡"
+            final_embed.add_field(name="💰 Winnings", value=win_display, inline=True)
         else:
-            final_embed.add_field(name="Loss", value=f"-{bet_amount:,} {CURRENCY_NAME}", inline=True)
+            final_embed.add_field(name="💸 Loss", value=f"**-{bet_amount:,} {CURRENCY_NAME}**", inline=True)
         
-        final_embed.add_field(name="New Balance", value=f"{user_data['balance']:,} {CURRENCY_NAME}", inline=True)
+        final_embed.add_field(name="💳 New Balance", value=f"**{user_data['balance']:,} {CURRENCY_NAME}**", inline=True)
         final_embed.add_field(name="Pay Table", value=pay_table, inline=False)
+        
+        # Add footer with some flair
+        if winnings > 0:
+            final_embed.set_footer(text="🎰 Congratulations! Play again for more chances to win! 🎰")
+        else:
+            final_embed.set_footer(text="🎰 Better luck next time! The jackpot is waiting! 🎰")
         
         await message.edit(embed=final_embed)
 
