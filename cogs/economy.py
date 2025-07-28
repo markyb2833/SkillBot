@@ -11,7 +11,9 @@ class Economy(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
         self.data_file = 'data/economy.json'
+        self.gambling_channels_file = 'data/gambling_channels.json'
         self.users = self.load_users()
+        self.gambling_channels = self.load_gambling_channels()
 
     def load_users(self):
         """Load user economy data from JSON file"""
@@ -30,6 +32,115 @@ class Economy(commands.Cog):
         """Save user economy data to JSON file"""
         with open(self.data_file, 'w') as f:
             json.dump(self.users, f, indent=2)
+    
+    def load_gambling_channels(self):
+        """Load gambling channel restrictions from JSON file"""
+        if not os.path.exists('data'):
+            os.makedirs('data')
+        
+        if os.path.exists(self.gambling_channels_file):
+            try:
+                with open(self.gambling_channels_file, 'r') as f:
+                    return json.load(f)
+            except:
+                return {}
+        return {}
+    
+    def save_gambling_channels(self):
+        """Save gambling channel restrictions to JSON file"""
+        with open(self.gambling_channels_file, 'w') as f:
+            json.dump(self.gambling_channels, f, indent=2)
+    
+    def is_gambling_allowed(self, ctx):
+        """Check if gambling is allowed in the current channel"""
+        guild_id = str(ctx.guild.id)
+        if guild_id not in self.gambling_channels:
+            return True  # No restrictions set, allow everywhere
+        
+        allowed_channels = self.gambling_channels[guild_id]
+        return ctx.channel.id in allowed_channels
+    
+    def get_gambling_channels_mention(self, ctx):
+        """Get formatted mention string for gambling channels"""
+        guild_id = str(ctx.guild.id)
+        if guild_id not in self.gambling_channels:
+            return "No gambling channels set"
+        
+        channels = []
+        for channel_id in self.gambling_channels[guild_id]:
+            channel = ctx.guild.get_channel(channel_id)
+            if channel:
+                channels.append(channel.mention)
+        
+        if not channels:
+            return "No valid gambling channels found"
+        
+        if len(channels) == 1:
+            return channels[0]
+        elif len(channels) == 2:
+            return f"{channels[0]} or {channels[1]}"
+        else:
+            return f"{', '.join(channels[:-1])}, or {channels[-1]}"
+    
+    async def auto_delete_message(self, message, delay):
+        """Auto-delete a message after a delay"""
+        await asyncio.sleep(delay)
+        try:
+            await message.delete()
+        except discord.NotFound:
+            pass  # Message already deleted
+        except discord.Forbidden:
+            pass  # No permission to delete
+    
+    async def send_gambling_error(self, ctx):
+        """Send a gambling restriction error and delete both messages"""
+        # Check if bot has permission to delete messages
+        can_delete_messages = ctx.channel.permissions_for(ctx.guild.me).manage_messages
+        
+        # Create error embed
+        embed = discord.Embed(
+            title="🚫 Gambling Not Allowed Here",
+            description=f"🎰 Gambling commands can only be used in {self.get_gambling_channels_mention(ctx)}",
+            color=COLORS['error']
+        )
+        
+        if can_delete_messages:
+            embed.set_footer(text="💡 This message will be deleted in 30 seconds")
+        else:
+            embed.set_footer(text="💡 Bot needs 'Manage Messages' permission to auto-delete")
+        
+        # Send error message with mention
+        error_message = await ctx.send(f"{ctx.author.mention}", embed=embed)
+        
+        # Delete both messages after 30 seconds (if we have permission)
+        asyncio.create_task(self.delete_both_messages(ctx.message, error_message, 30))
+    
+    async def delete_both_messages(self, original_message, error_message, delay):
+        """Delete both the original command and error message after a delay"""
+        await asyncio.sleep(delay)
+        
+        # Delete original command message
+        try:
+            await original_message.delete()
+        except discord.NotFound:
+            pass  # Message already deleted
+        except discord.Forbidden:
+            # Bot doesn't have permission to delete user messages
+            # This is expected if bot lacks "Manage Messages" permission
+            pass
+        except Exception as e:
+            print(f"Unexpected error deleting original message: {e}")
+        
+        # Delete error message
+        try:
+            await error_message.delete()
+        except discord.NotFound:
+            pass  # Message already deleted
+        except discord.Forbidden:
+            # Bot doesn't have permission to delete its own message (very rare)
+            pass
+        except Exception as e:
+            print(f"Unexpected error deleting error message: {e}")
 
     def get_user_data(self, user_id):
         """Get or create user data"""
@@ -173,6 +284,11 @@ class Economy(commands.Cog):
     @commands.command(name='gamble', aliases=['bet'])
     async def gamble(self, ctx, amount: str):
         """Gamble your coins! 50% chance to double your money! Usage: !gamble <amount|all|half>"""
+        # Check if gambling is allowed in this channel
+        if not self.is_gambling_allowed(ctx):
+            await self.send_gambling_error(ctx)
+            return
+        
         user_data = self.get_user_data(ctx.author.id)
         
         # Parse amount
@@ -230,6 +346,11 @@ class Economy(commands.Cog):
     @commands.command(name='coinflip', aliases=['cf'])
     async def coinflip_gamble(self, ctx, choice: str, amount: str):
         """Bet on a coinflip! Usage: !coinflip heads/tails <amount>"""
+        # Check if gambling is allowed in this channel
+        if not self.is_gambling_allowed(ctx):
+            await self.send_gambling_error(ctx)
+            return
+        
         user_data = self.get_user_data(ctx.author.id)
         
         if choice.lower() not in ['heads', 'tails', 'h', 't']:
@@ -368,6 +489,11 @@ class Economy(commands.Cog):
     @commands.command(name='roll')
     async def roll_gamble(self, ctx, target: int, amount: str):
         """Roll 0-99! Higher targets = better payouts! Usage: !roll <target> <amount>"""
+        # Check if gambling is allowed in this channel
+        if not self.is_gambling_allowed(ctx):
+            await self.send_gambling_error(ctx)
+            return
+        
         user_data = self.get_user_data(ctx.author.id)
         
         if target < 1 or target > 99:
@@ -435,6 +561,11 @@ class Economy(commands.Cog):
     @commands.command(name='blackjack', aliases=['bj'])
     async def blackjack(self, ctx, amount: str):
         """Play Blackjack against the house! Usage: !blackjack <amount>"""
+        # Check if gambling is allowed in this channel
+        if not self.is_gambling_allowed(ctx):
+            await self.send_gambling_error(ctx)
+            return
+        
         user_data = self.get_user_data(ctx.author.id)
         
         # Parse amount
@@ -630,6 +761,11 @@ class Economy(commands.Cog):
     @commands.command(name='slots', aliases=['slot'])
     async def slot_machine(self, ctx, amount: str):
         """Play the slot machine! Usage: !slots <amount>"""
+        # Check if gambling is allowed in this channel
+        if not self.is_gambling_allowed(ctx):
+            await self.send_gambling_error(ctx)
+            return
+        
         user_data = self.get_user_data(ctx.author.id)
         
         # Parse amount
@@ -824,6 +960,44 @@ class Economy(commands.Cog):
             final_embed.set_footer(text="🎰 Better luck next time! The jackpot is waiting! 🎰")
         
         await message.edit(embed=final_embed)
+    
+    @commands.command(name='gamblingchannels', aliases=['gc'])
+    async def show_gambling_channels(self, ctx):
+        """Show where gambling commands can be used"""
+        guild_id = str(ctx.guild.id)
+        
+        if guild_id not in self.gambling_channels or not self.gambling_channels[guild_id]:
+            embed = discord.Embed(
+                title="🎰 Gambling Channels",
+                description="Gambling is allowed in all channels!",
+                color=COLORS['info']
+            )
+        else:
+            channels = []
+            for channel_id in self.gambling_channels[guild_id]:
+                channel = ctx.guild.get_channel(channel_id)
+                if channel:
+                    channels.append(channel.mention)
+            
+            if channels:
+                embed = discord.Embed(
+                    title="🎰 Gambling Channels",
+                    description=f"Gambling commands can be used in:\n" + "\n".join([f"• {ch}" for ch in channels]),
+                    color=COLORS['info']
+                )
+                embed.add_field(
+                    name="🎲 Gambling Commands",
+                    value="• `!gamble` / `!bet`\n• `!roll`\n• `!blackjack` / `!bj`\n• `!slots` / `!slot`\n• `!coinflip` / `!cf`",
+                    inline=False
+                )
+            else:
+                embed = discord.Embed(
+                    title="🎰 Gambling Channels",
+                    description="No valid gambling channels found.",
+                    color=COLORS['warning']
+                )
+        
+        await ctx.send(embed=embed)
 
 async def setup(bot):
     await bot.add_cog(Economy(bot))

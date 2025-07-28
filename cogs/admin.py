@@ -525,9 +525,151 @@ class Admin(commands.Cog):
         
         await ctx.send(embed=embed)
 
+    @commands.command(name='setgamblingchannel', aliases=['sgc'])
+    @commands.has_permissions(administrator=True)
+    async def set_gambling_channel(self, ctx, channel: discord.TextChannel = None):
+        """Set a channel where gambling commands can be used (Admin only)"""
+        if channel is None:
+            channel = ctx.channel
+        
+        economy_cog = self.bot.get_cog('Economy')
+        if not economy_cog:
+            await ctx.send("❌ Economy system not loaded!")
+            return
+        
+        guild_id = str(ctx.guild.id)
+        if guild_id not in economy_cog.gambling_channels:
+            economy_cog.gambling_channels[guild_id] = []
+        
+        if channel.id in economy_cog.gambling_channels[guild_id]:
+            embed = discord.Embed(
+                title="⚠️ Channel Already Set",
+                description=f"{channel.mention} is already a gambling channel!",
+                color=COLORS['warning']
+            )
+        else:
+            economy_cog.gambling_channels[guild_id].append(channel.id)
+            economy_cog.save_gambling_channels()
+            
+            embed = discord.Embed(
+                title="✅ Gambling Channel Set",
+                description=f"Gambling commands can now be used in {channel.mention}",
+                color=COLORS['success']
+            )
+            embed.add_field(
+                name="🎰 Affected Commands",
+                value="• `!gamble` / `!bet`\n• `!roll`\n• `!blackjack` / `!bj`\n• `!slots` / `!slot`",
+                inline=False
+            )
+        
+        await ctx.send(embed=embed)
+    
+    @commands.command(name='removegamblingchannel', aliases=['rgc'])
+    @commands.has_permissions(administrator=True)
+    async def remove_gambling_channel(self, ctx, channel: discord.TextChannel = None):
+        """Remove a gambling channel restriction (Admin only)"""
+        if channel is None:
+            channel = ctx.channel
+        
+        economy_cog = self.bot.get_cog('Economy')
+        if not economy_cog:
+            await ctx.send("❌ Economy system not loaded!")
+            return
+        
+        guild_id = str(ctx.guild.id)
+        if guild_id not in economy_cog.gambling_channels or channel.id not in economy_cog.gambling_channels[guild_id]:
+            embed = discord.Embed(
+                title="⚠️ Channel Not Set",
+                description=f"{channel.mention} is not a gambling channel!",
+                color=COLORS['warning']
+            )
+        else:
+            economy_cog.gambling_channels[guild_id].remove(channel.id)
+            if not economy_cog.gambling_channels[guild_id]:
+                del economy_cog.gambling_channels[guild_id]
+            economy_cog.save_gambling_channels()
+            
+            embed = discord.Embed(
+                title="✅ Gambling Channel Removed",
+                description=f"Gambling commands can no longer be used in {channel.mention}",
+                color=COLORS['success']
+            )
+        
+        await ctx.send(embed=embed)
+    
+    @commands.command(name='cleargamblingchannels', aliases=['cgc'])
+    @commands.has_permissions(administrator=True)
+    async def clear_gambling_channels(self, ctx):
+        """Remove all gambling channel restrictions (allows gambling everywhere) (Admin only)"""
+        economy_cog = self.bot.get_cog('Economy')
+        if not economy_cog:
+            await ctx.send("❌ Economy system not loaded!")
+            return
+        
+        guild_id = str(ctx.guild.id)
+        if guild_id in economy_cog.gambling_channels:
+            del economy_cog.gambling_channels[guild_id]
+            economy_cog.save_gambling_channels()
+        
+        embed = discord.Embed(
+            title="✅ All Gambling Restrictions Cleared",
+            description="Gambling commands can now be used in any channel",
+            color=COLORS['success']
+        )
+        
+        await ctx.send(embed=embed)
+    
+    @commands.command(name='listgamblingchannels', aliases=['lgc'])
+    @commands.has_permissions(administrator=True)
+    async def list_gambling_channels(self, ctx):
+        """List all gambling channels (Admin only)"""
+        economy_cog = self.bot.get_cog('Economy')
+        if not economy_cog:
+            await ctx.send("❌ Economy system not loaded!")
+            return
+        
+        guild_id = str(ctx.guild.id)
+        if guild_id not in economy_cog.gambling_channels or not economy_cog.gambling_channels[guild_id]:
+            embed = discord.Embed(
+                title="🎰 Gambling Channels",
+                description="No gambling channel restrictions set.\nGambling is allowed in all channels.",
+                color=COLORS['info']
+            )
+        else:
+            channels = []
+            for channel_id in economy_cog.gambling_channels[guild_id]:
+                channel = ctx.guild.get_channel(channel_id)
+                if channel:
+                    channels.append(f"• {channel.mention}")
+                else:
+                    # Clean up deleted channels
+                    economy_cog.gambling_channels[guild_id].remove(channel_id)
+            
+            if channels:
+                embed = discord.Embed(
+                    title="🎰 Gambling Channels",
+                    description="Gambling commands are restricted to:\n" + "\n".join(channels),
+                    color=COLORS['info']
+                )
+            else:
+                embed = discord.Embed(
+                    title="🎰 Gambling Channels",
+                    description="No valid gambling channels found.\nAll restrictions have been cleared.",
+                    color=COLORS['warning']
+                )
+                del economy_cog.gambling_channels[guild_id]
+            
+            economy_cog.save_gambling_channels()
+        
+        await ctx.send(embed=embed)
+
     @admin_panel.error
     @set_balance.error
     @economy_reset.error
+    @set_gambling_channel.error
+    @remove_gambling_channel.error
+    @clear_gambling_channels.error
+    @list_gambling_channels.error
     async def admin_error(self, ctx, error):
         if isinstance(error, commands.MissingPermissions):
             await ctx.send("❌ You need administrator permissions to use this command!")
@@ -546,12 +688,14 @@ class Admin(commands.Cog):
         
         # Define command categorization
         economy_commands = ['balance', 'bal', 'daily', 'gift', 'pay', 'leaderboard', 'lb', 'top']
-        gambling_commands = ['gamble', 'bet', 'roll', 'coinflip', 'cf', 'blackjack', 'bj']
+        gambling_commands = ['gamble', 'bet', 'roll', 'coinflip', 'cf', 'blackjack', 'bj', 'slots', 'slot', 'gamblingchannels', 'gc']
         game_finder_commands = ['searchgame', 'sg', 'lfg', 'mygames', 'removegame', 'rg', 'lfginfo']
         admin_commands = [
             # Administrator permission commands
             'adminpanel', 'give', 'setbalance', 'economyreset',
             'setupcommandspanel', 'setupadmincommandspanel', 'updatecommandspanel',
+            'setgamblingchannel', 'sgc', 'removegamblingchannel', 'rgc', 
+            'cleargamblingchannels', 'cgc', 'listgamblingchannels', 'lgc',
             # Manage channels permission commands  
             'setuplfgpanel', 'setlfgchannel', 'removelfgchannel',
             'setupleaderboard', 'sethofchannel', 'removehofchannel'
