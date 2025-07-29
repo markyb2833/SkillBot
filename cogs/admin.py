@@ -687,7 +687,7 @@ class Admin(commands.Cog):
         }
         
         # Define command categorization
-        economy_commands = ['balance', 'bal', 'daily', 'gift', 'pay', 'leaderboard', 'lb', 'top']
+        economy_commands = ['balance', 'bal', 'daily', 'gift', 'pay', 'leaderboard', 'lb', 'top', 'welcomestatus', 'ws']
         gambling_commands = ['gamble', 'bet', 'roll', 'coinflip', 'cf', 'blackjack', 'bj', 'slots', 'slot', 'gamblingchannels', 'gc']
         game_finder_commands = ['searchgame', 'sg', 'lfg', 'mygames', 'removegame', 'rg', 'lfginfo']
         admin_commands = [
@@ -698,7 +698,9 @@ class Admin(commands.Cog):
             'cleargamblingchannels', 'cgc', 'listgamblingchannels', 'lgc',
             # Manage channels permission commands  
             'setuplfgpanel', 'setlfgchannel', 'removelfgchannel',
-            'setupleaderboard', 'sethofchannel', 'removehofchannel'
+            'setupleaderboard', 'sethofchannel', 'removehofchannel',
+            'setwelcomechannel', 'swc', 'setleavechannel', 'slc',
+            'welcometoggle', 'wt', 'leavetoggle', 'lt', 'welcomepreview', 'wp'
         ]
         
         # Get all commands from all cogs
