@@ -663,21 +663,7 @@ class Admin(commands.Cog):
         
         await ctx.send(embed=embed)
 
-    @admin_panel.error
-    @set_balance.error
-    @economy_reset.error
-    @set_gambling_channel.error
-    @remove_gambling_channel.error
-    @clear_gambling_channels.error
-    @list_gambling_channels.error
-    @cleanup_economy_command.error
-    @economy_stats_detailed.error
-    @toggle_auto_cleanup.error
-    async def admin_error(self, ctx, error):
-        if isinstance(error, commands.MissingPermissions):
-            await ctx.send("❌ You need administrator permissions to use this command!")
-        else:
-            await ctx.send(f"❌ An error occurred: {str(error)}")
+
 
     def get_command_categories(self):
         """Automatically categorize commands from all loaded cogs"""
@@ -1446,6 +1432,22 @@ class Admin(commands.Cog):
     async def panel_setup_error(self, ctx, error):
         if isinstance(error, commands.MissingPermissions):
             await ctx.send("❌ You need 'Manage Channels' permission to set up panels!")
+
+    @admin_panel.error
+    @set_balance.error
+    @economy_reset.error
+    @set_gambling_channel.error
+    @remove_gambling_channel.error
+    @clear_gambling_channels.error
+    @list_gambling_channels.error
+    @cleanup_economy_command.error
+    @economy_stats_detailed.error
+    @toggle_auto_cleanup.error
+    async def admin_error(self, ctx, error):
+        if isinstance(error, commands.MissingPermissions):
+            await ctx.send("❌ You need administrator permissions to use this command!")
+        else:
+            await ctx.send(f"❌ An error occurred: {str(error)}")
 
 async def setup(bot):
     await bot.add_cog(Admin(bot))
