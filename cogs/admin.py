@@ -670,6 +670,9 @@ class Admin(commands.Cog):
     @remove_gambling_channel.error
     @clear_gambling_channels.error
     @list_gambling_channels.error
+    @cleanup_economy_command.error
+    @economy_stats_detailed.error
+    @toggle_auto_cleanup.error
     async def admin_error(self, ctx, error):
         if isinstance(error, commands.MissingPermissions):
             await ctx.send("❌ You need administrator permissions to use this command!")
@@ -703,7 +706,8 @@ class Admin(commands.Cog):
             'welcometoggle', 'wt', 'leavetoggle', 'lt', 'welcomepreview', 'wp',
             'setbumpchannel', 'sbc', 'togglebumpreminder', 'tbr',
             'setbumpreward', 'sbr', 'setbumprole', 'sbro', 'manualbump', 'mb',
-            'setauditchannel', 'sac', 'toggleaudit', 'ta', 'auditconfig', 'ac'
+            'setauditchannel', 'sac', 'toggleaudit', 'ta', 'auditconfig', 'ac',
+            'cleanupeconomy', 'ce', 'economystats', 'es', 'toggleautocleanup', 'tac'
         ]
         
         # Get all commands from all cogs
@@ -1184,6 +1188,21 @@ class Admin(commands.Cog):
                 
                 try:
                     message = await channel.fetch_message(msg_info['message_id'])
+                    
+                    # Perform cleanup of users who left the server (every update)
+                    guild = self.bot.get_guild(guild_id)
+                    if guild:
+                        # Check if auto-cleanup is enabled
+                        guild_key = str(guild_id)
+                        auto_cleanup_enabled = True  # Default to enabled
+                        if 'cleanup_settings' in self.panel_data and guild_key in self.panel_data['cleanup_settings']:
+                            auto_cleanup_enabled = self.panel_data['cleanup_settings'][guild_key].get('auto_cleanup', True)
+                        
+                        if auto_cleanup_enabled:
+                            cleanup_count = await self.cleanup_economy_data(guild, economy_cog)
+                            if cleanup_count > 0:
+                                print(f"🧹 Auto-cleaned up {cleanup_count} users who left guild {guild_id}")
+                    
                     embed = await self.create_leaderboard_embed(economy_cog)
                     await message.edit(embed=embed)
                     print(f"✅ Updated leaderboard for guild {guild_id}")
@@ -1205,6 +1224,214 @@ class Admin(commands.Cog):
                 continue  # Don't break - keep trying
         
         print(f"🛑 Leaderboard update loop stopped for guild {guild_id}")
+
+    async def cleanup_economy_data(self, guild, economy_cog):
+        """Clean up economy data for users who left the server"""
+        if not economy_cog or not economy_cog.users:
+            return 0
+        
+        cleanup_count = 0
+        users_to_remove = []
+        
+        # Check each user in the economy data
+        for user_id_str in economy_cog.users.keys():
+            try:
+                user_id = int(user_id_str)
+                member = guild.get_member(user_id)
+                
+                # If user is not in the server anymore, mark for removal
+                if not member:
+                    users_to_remove.append(user_id_str)
+                    cleanup_count += 1
+            except ValueError:
+                # Invalid user ID, remove it
+                users_to_remove.append(user_id_str)
+                cleanup_count += 1
+        
+        # Remove users who left
+        for user_id_str in users_to_remove:
+            del economy_cog.users[user_id_str]
+        
+        # Save changes if any cleanup was done
+        if cleanup_count > 0:
+            economy_cog.save_users()
+        
+        return cleanup_count
+
+    @commands.command(name='cleanupeconomy', aliases=['ce'])
+    @commands.has_permissions(administrator=True)
+    async def cleanup_economy_command(self, ctx):
+        """Manually clean up economy data for users who left the server (Admin only)"""
+        economy_cog = self.bot.get_cog('Economy')
+        if not economy_cog:
+            await ctx.send("❌ Economy system not loaded!")
+            return
+        
+        # Show initial stats
+        initial_count = len(economy_cog.users)
+        
+        # Perform cleanup
+        cleanup_count = await self.cleanup_economy_data(ctx.guild, economy_cog)
+        
+        # Create result embed
+        embed = discord.Embed(
+            title="🧹 Economy Cleanup Complete",
+            color=COLORS['success'] if cleanup_count > 0 else COLORS['info']
+        )
+        
+        embed.add_field(
+            name="📊 Before Cleanup",
+            value=f"{initial_count:,} users in database",
+            inline=True
+        )
+        
+        embed.add_field(
+            name="🗑️ Removed",
+            value=f"{cleanup_count:,} users who left",
+            inline=True
+        )
+        
+        embed.add_field(
+            name="📊 After Cleanup",
+            value=f"{len(economy_cog.users):,} users remaining",
+            inline=True
+        )
+        
+        if cleanup_count > 0:
+            embed.add_field(
+                name="✅ Result",
+                value=f"Successfully cleaned up {cleanup_count} users who are no longer in the server",
+                inline=False
+            )
+        else:
+            embed.add_field(
+                name="ℹ️ Result",
+                value="No cleanup needed - all users in database are still in the server",
+                inline=False
+            )
+        
+        await ctx.send(embed=embed)
+
+    @commands.command(name='economystats', aliases=['es'])
+    @commands.has_permissions(administrator=True)
+    async def economy_stats_detailed(self, ctx):
+        """Show detailed economy statistics including cleanup info (Admin only)"""
+        economy_cog = self.bot.get_cog('Economy')
+        if not economy_cog:
+            await ctx.send("❌ Economy system not loaded!")
+            return
+        
+        if not economy_cog.users:
+            await ctx.send("📊 No economy data found!")
+            return
+        
+        # Analyze the data
+        total_users_in_db = len(economy_cog.users)
+        users_still_in_server = 0
+        users_who_left = 0
+        invalid_users = 0
+        
+        for user_id_str in economy_cog.users.keys():
+            try:
+                user_id = int(user_id_str)
+                member = ctx.guild.get_member(user_id)
+                if member:
+                    users_still_in_server += 1
+                else:
+                    users_who_left += 1
+            except ValueError:
+                invalid_users += 1
+        
+        # Calculate economy stats
+        total_currency = sum(user['balance'] for user in economy_cog.users.values())
+        avg_balance = total_currency / total_users_in_db if total_users_in_db > 0 else 0
+        
+        # Create detailed embed
+        embed = discord.Embed(
+            title="📊 Detailed Economy Statistics",
+            color=COLORS['info']
+        )
+        
+        embed.add_field(
+            name="👥 User Analysis",
+            value=f"**Total in Database:** {total_users_in_db:,}\n**Still in Server:** {users_still_in_server:,}\n**Left Server:** {users_who_left:,}\n**Invalid Entries:** {invalid_users:,}",
+            inline=True
+        )
+        
+        embed.add_field(
+            name="💰 Economy Overview",
+            value=f"**Total Currency:** {total_currency:,} coins\n**Average Balance:** {avg_balance:,.0f} coins",
+            inline=True
+        )
+        
+        if users_who_left > 0 or invalid_users > 0:
+            cleanup_potential = users_who_left + invalid_users
+            embed.add_field(
+                name="🧹 Cleanup Potential",
+                value=f"**Can Remove:** {cleanup_potential:,} entries\n**Space Savings:** {(cleanup_potential/total_users_in_db)*100:.1f}%",
+                inline=True
+            )
+            
+            embed.add_field(
+                name="💡 Recommendation",
+                value="Use `!cleanupeconomy` to remove data for users who left the server",
+                inline=False
+            )
+        else:
+            embed.add_field(
+                name="✅ Database Health",
+                value="All users in database are still in the server - no cleanup needed!",
+                inline=False
+            )
+        
+        embed.add_field(
+            name="🔄 Auto-Cleanup",
+            value="Economy data is automatically cleaned during leaderboard updates every 5 minutes",
+            inline=False
+        )
+        
+        await ctx.send(embed=embed)
+
+    @commands.command(name='toggleautocleanup', aliases=['tac'])
+    @commands.has_permissions(administrator=True)
+    async def toggle_auto_cleanup(self, ctx):
+        """Toggle automatic cleanup during leaderboard updates (Admin only)"""
+        # For now, we'll store this in the panel_data
+        guild_key = str(ctx.guild.id)
+        if 'cleanup_settings' not in self.panel_data:
+            self.panel_data['cleanup_settings'] = {}
+        
+        if guild_key not in self.panel_data['cleanup_settings']:
+            self.panel_data['cleanup_settings'][guild_key] = {'auto_cleanup': True}
+        
+        current_setting = self.panel_data['cleanup_settings'][guild_key].get('auto_cleanup', True)
+        new_setting = not current_setting
+        self.panel_data['cleanup_settings'][guild_key]['auto_cleanup'] = new_setting
+        self.save_panel_data()
+        
+        status = "enabled" if new_setting else "disabled"
+        color = COLORS['success'] if new_setting else COLORS['warning']
+        
+        embed = discord.Embed(
+            title=f"✅ Auto-Cleanup {status.title()}",
+            description=f"Automatic economy cleanup is now **{status}**",
+            color=color
+        )
+        
+        if new_setting:
+            embed.add_field(
+                name="🔄 How it Works",
+                value="Economy data for users who left will be automatically cleaned every 5 minutes during leaderboard updates",
+                inline=False
+            )
+        else:
+            embed.add_field(
+                name="⚠️ Manual Cleanup",
+                value="You'll need to use `!cleanupeconomy` manually to clean up old user data",
+                inline=False
+            )
+        
+        await ctx.send(embed=embed)
 
     async def auto_delete_message(self, message, delay):
         """Auto-delete message after delay"""
