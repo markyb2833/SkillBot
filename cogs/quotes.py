@@ -128,8 +128,25 @@ class Quotes(commands.Cog):
                 'url': embed.url,
                 'color': embed.color.value if embed.color else None,
                 'image': embed.image.url if embed.image else None,
-                'thumbnail': embed.thumbnail.url if embed.thumbnail else None
+                'thumbnail': embed.thumbnail.url if embed.thumbnail else None,
+                'fields': []
             }
+            
+            # Capture embed fields (important for gambling results)
+            for field in embed.fields:
+                embed_data['fields'].append({
+                    'name': field.name,
+                    'value': field.value,
+                    'inline': field.inline
+                })
+            
+            # Capture footer information
+            if embed.footer:
+                embed_data['footer'] = {
+                    'text': embed.footer.text,
+                    'icon_url': embed.footer.icon_url
+                }
+            
             quote_data['embeds'].append(embed_data)
 
         # Add to database
@@ -156,10 +173,42 @@ class Quotes(commands.Cog):
 
     async def create_quote_embed(self, quote_data, guild):
         """Create a fancy quote embed"""
-        # Main embed
-        embed = discord.Embed(
-            color=COLORS['primary']
-        )
+        # Detect if this is a gambling win embed
+        is_gambling_win = False
+        gambling_type = None
+        
+        if quote_data['embeds']:
+            first_embed = quote_data['embeds'][0]
+            title = first_embed.get('title', '').lower()
+            
+            # Check for gambling win indicators
+            if any(keyword in title for keyword in ['winner', 'jackpot', 'mega win', 'big win', 'nice win']):
+                is_gambling_win = True
+                if 'slot' in title:
+                    gambling_type = 'slots'
+                elif 'blackjack' in title:
+                    gambling_type = 'blackjack'
+                elif 'roll' in title:
+                    gambling_type = 'roll'
+                else:
+                    gambling_type = 'gambling'
+        
+        # Set embed color based on content
+        if is_gambling_win:
+            embed_color = 0xFFD700  # Gold for gambling wins
+        else:
+            embed_color = COLORS['primary']
+        
+        # Main embed with special title for gambling wins
+        if is_gambling_win:
+            embed = discord.Embed(
+                title=f"🏆 Epic {gambling_type.title()} Win Hall of Fame! 🏆",
+                color=embed_color
+            )
+        else:
+            embed = discord.Embed(
+                color=embed_color
+            )
 
         # Author info with styled name (preserved even if user leaves)
         author_display = f"**{quote_data['author_name']}**"
@@ -218,25 +267,60 @@ class Quotes(commands.Cog):
                     inline=False
                 )
 
-        # Handle embeds from original message
+        # Handle embeds from original message - Enhanced display
         if quote_data['embeds']:
-            embed_info = []
-            for orig_embed in quote_data['embeds'][:2]:  # Max 2 embeds
+            for i, orig_embed in enumerate(quote_data['embeds'][:1]):  # Show first embed in detail
+                # Add embed title if it exists
                 if orig_embed['title']:
-                    embed_info.append(f"📋 {orig_embed['title']}")
-                elif orig_embed['description']:
-                    desc = orig_embed['description'][:50] + "..." if len(orig_embed['description']) > 50 else orig_embed['description']
-                    embed_info.append(f"📋 {desc}")
-            
-            if embed_info:
-                embed.add_field(
-                    name="📋 Embedded Content",
-                    value="\n".join(embed_info),
-                    inline=False
-                )
+                    embed.add_field(
+                        name="🎰 Original Embed Title",
+                        value=f"**{orig_embed['title']}**",
+                        inline=False
+                    )
+                
+                # Add embed description if it exists
+                if orig_embed['description']:
+                    desc = orig_embed['description']
+                    if len(desc) > 500:
+                        desc = desc[:497] + "..."
+                    embed.add_field(
+                        name="📋 Embed Content",
+                        value=desc,
+                        inline=False
+                    )
+                
+                # Add important embed fields (like gambling results)
+                if orig_embed.get('fields'):
+                    important_fields = []
+                    for field in orig_embed['fields'][:4]:  # Max 4 fields
+                        field_text = f"**{field['name']}:** {field['value']}"
+                        if len(field_text) > 100:
+                            field_text = field_text[:97] + "..."
+                        important_fields.append(field_text)
+                    
+                    if important_fields:
+                        embed.add_field(
+                            name="🎯 Key Details",
+                            value="\n".join(important_fields),
+                            inline=False
+                        )
+                
+                # Set image from original embed if it exists
+                if orig_embed['image'] and not embed.image:
+                    embed.set_image(url=orig_embed['image'])
+                
+                # Set thumbnail from original embed if it exists
+                if orig_embed['thumbnail'] and not embed.thumbnail:
+                    embed.set_thumbnail(url=orig_embed['thumbnail'])
 
+        # Special footer for gambling wins
+        if is_gambling_win:
+            footer_text = f"🎰 Epic {gambling_type.title()} Win • Hall of Fame • React to celebrate!"
+        else:
+            footer_text = "Hall of Fame • React to show appreciation!"
+        
         embed.set_footer(
-            text=f"Hall of Fame • React to show appreciation!",
+            text=footer_text,
             icon_url=guild.icon.url if guild.icon else None
         )
 
@@ -426,6 +510,112 @@ class Quotes(commands.Cog):
             )
         
         await ctx.send(embed=embed)
+
+    @commands.command(name='hofwin', aliases=['hw'])
+    async def hof_last_win(self, ctx, lookback: int = 10):
+        """Hall of fame the most recent gambling win in this channel (looks back up to 10 messages)"""
+        # Check if Hall of Fame channel is set
+        hof_channel_id = self.get_hof_channel(ctx.guild.id)
+        if not hof_channel_id:
+            await ctx.send("❌ Hall of Fame channel not set! Use `!sethofchannel` first.")
+            return
+
+        hof_channel = ctx.guild.get_channel(hof_channel_id)
+        if not hof_channel:
+            await ctx.send("❌ Hall of Fame channel no longer exists!")
+            return
+        
+        # Look for recent gambling wins
+        lookback = min(max(lookback, 1), 50)  # Limit between 1-50 messages
+        
+        try:
+            messages = []
+            async for message in ctx.channel.history(limit=lookback):
+                if message.author.bot and message.embeds:
+                    for embed in message.embeds:
+                        title = embed.title.lower() if embed.title else ""
+                        if any(keyword in title for keyword in ['winner', 'jackpot', 'mega win', 'big win', 'nice win']):
+                            messages.append(message)
+                            break
+            
+            if not messages:
+                await ctx.send(f"❌ No gambling wins found in the last {lookback} messages!")
+                return
+            
+            # Use the most recent win
+            win_message = messages[0]
+            
+            # Create quote data (similar to regular hof command)
+            quote_data = {
+                'message_id': win_message.id,
+                'channel_id': win_message.channel.id,
+                'channel_name': win_message.channel.name,
+                'author_id': win_message.author.id,
+                'author_name': win_message.author.display_name,
+                'author_username': str(win_message.author),
+                'content': win_message.content,
+                'timestamp': win_message.created_at.isoformat(),
+                'added_by': ctx.author.id,
+                'added_by_name': str(ctx.author),
+                'attachments': [],
+                'embeds': []
+            }
+
+            # Handle embeds
+            for embed in win_message.embeds:
+                embed_data = {
+                    'title': embed.title,
+                    'description': embed.description,
+                    'url': embed.url,
+                    'color': embed.color.value if embed.color else None,
+                    'image': embed.image.url if embed.image else None,
+                    'thumbnail': embed.thumbnail.url if embed.thumbnail else None,
+                    'fields': []
+                }
+                
+                # Capture embed fields
+                for field in embed.fields:
+                    embed_data['fields'].append({
+                        'name': field.name,
+                        'value': field.value,
+                        'inline': field.inline
+                    })
+                
+                # Capture footer information
+                if embed.footer:
+                    embed_data['footer'] = {
+                        'text': embed.footer.text,
+                        'icon_url': embed.footer.icon_url
+                    }
+                
+                quote_data['embeds'].append(embed_data)
+
+            # Add to database
+            quote_id = self.add_quote(ctx.guild.id, quote_data)
+
+            # Create Hall of Fame embed
+            hof_embed = await self.create_quote_embed(quote_data, ctx.guild)
+            
+            # Post to Hall of Fame channel
+            hof_message = await hof_channel.send(embed=hof_embed)
+
+            # Add special reactions for gambling wins
+            await hof_message.add_reaction("🎰")
+            await hof_message.add_reaction("💰")
+            await hof_message.add_reaction("🔥")
+            await hof_message.add_reaction("🎉")
+
+            # Confirm to user
+            win_title = win_message.embeds[0].title if win_message.embeds and win_message.embeds[0].title else "Gambling Win"
+            confirm_embed = discord.Embed(
+                title="🏆 Epic Win Added to Hall of Fame!",
+                description=f"**{win_title}** has been immortalized as Quote #{quote_id} in {hof_channel.mention}!",
+                color=0xFFD700
+            )
+            await ctx.send(embed=confirm_embed, delete_after=15)
+            
+        except Exception as e:
+            await ctx.send(f"❌ Error finding gambling win: {str(e)}")
 
     @set_hof_channel_command.error
     @remove_hof_channel.error
