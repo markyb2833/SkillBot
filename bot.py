@@ -30,17 +30,23 @@ async def on_ready():
 
 @bot.event
 async def on_command_error(ctx, error):
-    if isinstance(error, commands.CommandNotFound):
-        await ctx.send("🤔 Command not found! Use `!help` to see available commands.")
-    elif isinstance(error, commands.MissingRequiredArgument):
-        await ctx.send(f"❌ Missing required argument: {error.param}")
-    else:
-        await ctx.send(f"❌ An error occurred: {str(error)}")
-        print(f"Error: {error}")
+    try:
+        if isinstance(error, commands.CommandNotFound):
+            await ctx.send("🤔 Command not found! Use `!help` to see available commands.")
+        elif isinstance(error, commands.MissingRequiredArgument):
+            await ctx.send(f"❌ Missing required argument: {error.param}")
+        else:
+            await ctx.send(f"❌ An error occurred: {str(error)}")
+            print(f"Error: {error}")
+    except discord.Forbidden:
+        # Bot doesn't have permission to send messages in this channel
+        print(f"Cannot send error message in {ctx.channel.name}: Missing permissions")
+    except Exception as e:
+        print(f"Error in error handler: {e}")
 
 # Load cogs
 async def load_cogs():
-    cogs = ['cogs.games', 'cogs.group_finder', 'cogs.integrations', 'cogs.economy', 'cogs.admin', 'cogs.quotes']
+    cogs = ['cogs.games', 'cogs.group_finder', 'cogs.integrations', 'cogs.economy', 'cogs.admin', 'cogs.quotes', 'cogs.welcome']
     for cog in cogs:
         try:
             await bot.load_extension(cog)
