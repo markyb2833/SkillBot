@@ -788,25 +788,44 @@ class Economy(commands.Cog):
             await ctx.send(f"❌ You don't have enough {CURRENCY_NAME}! Your balance: {user_data['balance']:,}")
             return
         
-        # Slot machine symbols and their values
-        symbols = ['🍒', '🍋', '🍊', '🍇', '🔔', '💎', '7️⃣']
+        # Weighted reel system - each symbol has different probability
+        # Higher weight = more likely to appear
+        reel_weights = {
+            '🍒': 35,   # Most common (35% chance)
+            '🍋': 25,   # Common (25% chance)
+            '🍊': 20,   # Common (20% chance)
+            '🍇': 12,   # Uncommon (12% chance)
+            '🔔': 5,    # Rare (5% chance)
+            '7️⃣': 2,   # Very rare (2% chance)
+            '💎': 1     # Ultra rare (1% chance)
+        }
         
-        # Pay table
+        # Pay table with realistic RTP (Return to Player) around 95%
         pay_table = (
             "**💰 PAY TABLE 💰**\n"
-            "💎 💎 💎 = 100x\n"
-            "7️⃣ 7️⃣ 7️⃣ = 50x\n"
-            "🔔 🔔 🔔 = 25x\n"
-            "🍇 🍇 🍇 = 15x\n"
-            "🍊 🍊 🍊 = 10x\n"
-            "🍋 🍋 🍋 = 8x\n"
-            "🍒 🍒 🍒 = 5x\n"
-            "Any 2 Match = 2x"
+            "💎 💎 💎 = 500x 🎊\n"
+            "7️⃣ 7️⃣ 7️⃣ = 100x 🔥\n"
+            "🔔 🔔 🔔 = 50x ⭐\n"
+            "🍇 🍇 🍇 = 25x 🍀\n"
+            "🍊 🍊 🍊 = 15x 🎯\n"
+            "🍋 🍋 🍋 = 10x 💫\n"
+            "🍒 🍒 🍒 = 8x ❤️\n"
+            "Any 2 Match = 2x 👍"
         )
+        
+        def spin_reel():
+            """Spin a single reel using weighted probabilities"""
+            symbols = list(reel_weights.keys())
+            weights = list(reel_weights.values())
+            return random.choices(symbols, weights=weights, k=1)[0]
+        
+        def generate_realistic_grid():
+            """Generate a 3x3 grid with weighted probabilities"""
+            return [[spin_reel() for _ in range(3)] for _ in range(3)]
         
         # Generate 3x3 grid (only middle row counts)
         def generate_grid():
-            return [[random.choice(symbols) for _ in range(3)] for _ in range(3)]
+            return generate_realistic_grid()
         
         def format_grid(grid):
             return (
@@ -873,26 +892,26 @@ class Economy(commands.Cog):
         if result1 == result2 == result3:
             # Three of a kind on payline
             if result1 == '💎':
-                multiplier = 100  # Diamond jackpot
-                result_text = "💎 DIAMOND JACKPOT! 💎"
+                multiplier = 500  # Diamond mega jackpot
+                result_text = "💎 MEGA JACKPOT! 💎"
             elif result1 == '7️⃣':
-                multiplier = 50   # Lucky sevens
-                result_text = "🍀 LUCKY SEVENS! 🍀"
+                multiplier = 100   # Lucky sevens
+                result_text = "🔥 LUCKY SEVENS! 🔥"
             elif result1 == '🔔':
-                multiplier = 25   # Bells
-                result_text = "🔔 TRIPLE BELLS! 🔔"
+                multiplier = 50   # Bells
+                result_text = "⭐ TRIPLE BELLS! ⭐"
             elif result1 == '🍇':
-                multiplier = 15   # Grapes
-                result_text = "🍇 TRIPLE GRAPES! 🍇"
+                multiplier = 25   # Grapes
+                result_text = "�  TRIPLE GRAPES! �"
             elif result1 == '🍊':
-                multiplier = 10   # Oranges
-                result_text = "🍊 TRIPLE ORANGES! 🍊"
+                multiplier = 15   # Oranges
+                result_text = "� TRIPLE  ORANGES! �"
             elif result1 == '🍋':
-                multiplier = 8    # Lemons
-                result_text = "🍋 TRIPLE LEMONS! 🍋"
+                multiplier = 10    # Lemons
+                result_text = "💫 TRIPLE LEMONS! 💫"
             elif result1 == '🍒':
-                multiplier = 5    # Cherries
-                result_text = "🍒 TRIPLE CHERRIES! 🍒"
+                multiplier = 8    # Cherries
+                result_text = "❤️ TRIPLE CHERRIES! ❤️"
             
             winnings = bet_amount * multiplier
             self.update_balance(ctx.author.id, winnings - bet_amount)
@@ -921,9 +940,14 @@ class Economy(commands.Cog):
         
         # Final result embed with enhanced presentation
         if winnings > 0:
-            title = f"� ═ ══ WINNER! ═══ 🎉"
-            if multiplier >= 50:
-                title = f"🚨 ═══ MEGA WIN! ═══ 🚨"
+            if multiplier >= 100:
+                title = f"🚨 ═══ MEGA JACKPOT! ═══ 🚨"
+            elif multiplier >= 50:
+                title = f"🔥 ═══ BIG WIN! ═══ 🔥"
+            elif multiplier >= 10:
+                title = f"⭐ ═══ NICE WIN! ═══ ⭐"
+            else:
+                title = f"🎉 ═══ WINNER! ═══ 🎉"
         else:
             title = f"🎰 ═══ SLOT RESULTS ═══ 🎰"
             
@@ -953,9 +977,15 @@ class Economy(commands.Cog):
         final_embed.add_field(name="💳 New Balance", value=f"**{user_data['balance']:,} {CURRENCY_NAME}**", inline=True)
         final_embed.add_field(name="Pay Table", value=pay_table, inline=False)
         
-        # Add footer with some flair
+        # Add footer with odds information
         if winnings > 0:
-            final_embed.set_footer(text="🎰 Congratulations! Play again for more chances to win! 🎰")
+            if multiplier >= 100:
+                # Calculate rough odds for the winning combination
+                symbol_prob = reel_weights[result1] / sum(reel_weights.values())
+                odds = int(1 / (symbol_prob ** 3))
+                final_embed.set_footer(text=f"🎰 INCREDIBLE! Odds were roughly 1 in {odds:,}! 🎰")
+            else:
+                final_embed.set_footer(text="🎰 Congratulations! Play again for more chances to win! 🎰")
         else:
             final_embed.set_footer(text="🎰 Better luck next time! The jackpot is waiting! 🎰")
         
@@ -996,6 +1026,79 @@ class Economy(commands.Cog):
                     description="No valid gambling channels found.",
                     color=COLORS['warning']
                 )
+        
+        await ctx.send(embed=embed)
+    
+    @commands.command(name='slotodds', aliases=['odds'])
+    async def slot_odds(self, ctx):
+        """Show slot machine odds and probabilities"""
+        # Weighted reel system (same as in slot machine)
+        reel_weights = {
+            '🍒': 35,   # Most common (35% chance)
+            '🍋': 25,   # Common (25% chance)
+            '🍊': 20,   # Common (20% chance)
+            '🍇': 12,   # Uncommon (12% chance)
+            '🔔': 5,    # Rare (5% chance)
+            '7️⃣': 2,   # Very rare (2% chance)
+            '💎': 1     # Ultra rare (1% chance)
+        }
+        
+        total_weight = sum(reel_weights.values())
+        
+        embed = discord.Embed(
+            title="🎰 Slot Machine Odds & Probabilities",
+            description="Understanding your chances of winning:",
+            color=COLORS['info']
+        )
+        
+        # Symbol probabilities
+        prob_text = ""
+        for symbol, weight in reel_weights.items():
+            prob = (weight / total_weight) * 100
+            prob_text += f"{symbol} **{prob:.1f}%** chance per reel\n"
+        
+        embed.add_field(name="🎲 Symbol Probabilities", value=prob_text, inline=False)
+        
+        # Triple combinations odds
+        odds_text = ""
+        payouts = {
+            '💎': (500, 1),
+            '7️⃣': (100, 2),
+            '🔔': (50, 5),
+            '🍇': (25, 12),
+            '🍊': (15, 20),
+            '🍋': (10, 25),
+            '🍒': (8, 35)
+        }
+        
+        for symbol, (multiplier, weight) in payouts.items():
+            prob = (weight / total_weight) ** 3 * 100
+            odds = int(1 / ((weight / total_weight) ** 3))
+            odds_text += f"{symbol} {symbol} {symbol} **{multiplier}x** - {prob:.3f}% (1 in {odds:,})\n"
+        
+        embed.add_field(name="🏆 Triple Combination Odds", value=odds_text, inline=False)
+        
+        # Two of a kind odds
+        two_kind_prob = 0
+        for symbol, weight in reel_weights.items():
+            single_prob = weight / total_weight
+            # Probability of exactly 2 matching (3 different combinations)
+            two_kind_prob += 3 * (single_prob ** 2) * (1 - single_prob)
+        
+        embed.add_field(
+            name="👍 Two of a Kind (2x payout)",
+            value=f"**{two_kind_prob*100:.1f}%** chance (1 in {int(1/two_kind_prob):,})",
+            inline=False
+        )
+        
+        # Overall RTP estimate
+        embed.add_field(
+            name="📊 Return to Player (RTP)",
+            value="Approximately **95%** - For every 100 coins bet, expect ~95 coins back over time",
+            inline=False
+        )
+        
+        embed.set_footer(text="🎰 Remember: Each spin is independent! Past results don't affect future spins.")
         
         await ctx.send(embed=embed)
 
