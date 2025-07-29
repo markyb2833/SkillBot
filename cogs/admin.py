@@ -687,7 +687,7 @@ class Admin(commands.Cog):
         }
         
         # Define command categorization
-        economy_commands = ['balance', 'bal', 'daily', 'gift', 'pay', 'leaderboard', 'lb', 'top', 'welcomestatus', 'ws']
+        economy_commands = ['balance', 'bal', 'daily', 'gift', 'pay', 'leaderboard', 'lb', 'top', 'welcomestatus', 'ws', 'bumpstats', 'bs', 'auditstatus', 'as']
         gambling_commands = ['gamble', 'bet', 'roll', 'coinflip', 'cf', 'blackjack', 'bj', 'slots', 'slot', 'gamblingchannels', 'gc']
         game_finder_commands = ['searchgame', 'sg', 'lfg', 'mygames', 'removegame', 'rg', 'lfginfo']
         admin_commands = [
@@ -700,7 +700,10 @@ class Admin(commands.Cog):
             'setuplfgpanel', 'setlfgchannel', 'removelfgchannel',
             'setupleaderboard', 'sethofchannel', 'removehofchannel',
             'setwelcomechannel', 'swc', 'setleavechannel', 'slc',
-            'welcometoggle', 'wt', 'leavetoggle', 'lt', 'welcomepreview', 'wp'
+            'welcometoggle', 'wt', 'leavetoggle', 'lt', 'welcomepreview', 'wp',
+            'setbumpchannel', 'sbc', 'togglebumpreminder', 'tbr',
+            'setbumpreward', 'sbr', 'setbumprole', 'sbro', 'manualbump', 'mb',
+            'setauditchannel', 'sac', 'toggleaudit', 'ta', 'auditconfig', 'ac'
         ]
         
         # Get all commands from all cogs
