@@ -46,7 +46,9 @@ async def on_command_error(ctx, error):
 
 # Load cogs
 async def load_cogs():
-    cogs = ['cogs.games', 'cogs.group_finder', 'cogs.integrations', 'cogs.economy', 'cogs.admin', 'cogs.quotes', 'cogs.welcome', 'cogs.bump_reminder', 'cogs.audit_log']
+    cogs = ['cogs.games', 'cogs.group_finder', 'cogs.integrations', 'cogs.economy',
+            'cogs.admin', 'cogs.quotes', 'cogs.welcome', 'cogs.bump_reminder', 'cogs.audit_log',
+            'cogs.rpg']
     for cog in cogs:
         try:
             await bot.load_extension(cog)
