@@ -4,6 +4,8 @@
     "level": 1,
     "hp": 100,
     "mp": 10,
-    "equipment": [1]
+    "equipment": [
+      1
+    ]
   }
 }
