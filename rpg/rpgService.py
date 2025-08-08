@@ -29,7 +29,7 @@ class RpgService:
             json.dump(self.users, f, indent=2)
 
 
-    def __load_equipment_data(self):
+    def load_equipment_data(self):
         """Load equipment data from JSON file"""
         if not os.path.exists('data/rpg'):
             os.makedirs('data/rpg')
@@ -45,7 +45,7 @@ class RpgService:
 
 
     def get_equipment_string(self, equipment_array):
-        equipmentData = self.__load_equipment_data()
+        equipmentData = self.load_equipment_data()
         first = True
         equipment_string = ''
         for equipment in equipment_array:
