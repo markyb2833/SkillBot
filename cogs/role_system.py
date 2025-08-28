@@ -271,33 +271,44 @@ class ManagePanelsModal(discord.ui.Modal, title="Manage Role Panels"):
     )
 
     async def on_submit(self, interaction: discord.Interaction):
-        action = self.action.value.lower()
-        panel_id = self.panel_id.value.lower()
-        panel_name = self.panel_name.value or panel_id.title()
-        
-        if action == "create":
-            success = await self.cog.create_panel(interaction.guild.id, panel_id, panel_name)
-            if success:
-                await interaction.response.send_message(f"✅ Panel '{panel_name}' created successfully!", ephemeral=True, delete_after=15)
+        try:
+            action = self.action.value.lower()
+            panel_id = self.panel_id.value.lower()
+            panel_name = self.panel_name.value or panel_id.title()
+            
+            if action == "create":
+                success = await self.cog.create_panel(interaction.guild.id, panel_id, panel_name)
+                if success:
+                    await interaction.response.send_message(f"✅ Panel '{panel_name}' created successfully!", ephemeral=True, delete_after=15)
+                else:
+                    await interaction.response.send_message("❌ Panel already exists or creation failed!", ephemeral=True, delete_after=15)
+            
+            elif action == "edit":
+                success = await self.cog.edit_panel(interaction.guild.id, panel_id, panel_name)
+                if success:
+                    await interaction.response.send_message(f"✅ Panel '{panel_id}' updated successfully!", ephemeral=True, delete_after=15)
+                else:
+                    await interaction.response.send_message("❌ Panel not found or update failed!", ephemeral=True, delete_after=15)
+            
+            elif action == "delete":
+                success = await self.cog.delete_panel(interaction.guild.id, panel_id)
+                if success:
+                    await interaction.response.send_message(f"✅ Panel '{panel_id}' deleted successfully!", ephemeral=True, delete_after=15)
+                else:
+                    await interaction.response.send_message("❌ Panel not found or deletion failed!", ephemeral=True, delete_after=15)
+            
             else:
-                await interaction.response.send_message("❌ Panel already exists or creation failed!", ephemeral=True, delete_after=15)
-        
-        elif action == "edit":
-            success = await self.cog.edit_panel(interaction.guild.id, panel_id, panel_name)
-            if success:
-                await interaction.response.send_message(f"✅ Panel '{panel_id}' updated successfully!", ephemeral=True, delete_after=15)
-            else:
-                await interaction.response.send_message("❌ Panel not found or update failed!", ephemeral=True, delete_after=15)
-        
-        elif action == "delete":
-            success = await self.cog.delete_panel(interaction.guild.id, panel_id)
-            if success:
-                await interaction.response.send_message(f"✅ Panel '{panel_id}' deleted successfully!", ephemeral=True, delete_after=15)
-            else:
-                await interaction.response.send_message("❌ Panel not found or deletion failed!", ephemeral=True, delete_after=15)
-        
-        else:
-            await interaction.response.send_message("❌ Invalid action! Use: create, edit, or delete", ephemeral=True, delete_after=15)
+                await interaction.response.send_message("❌ Invalid action! Use: create, edit, or delete", ephemeral=True, delete_after=15)
+        except Exception as e:
+            print(f"Error managing panels: {e}")
+            try:
+                await interaction.response.send_message("❌ An error occurred while managing panels. Please try again.", ephemeral=True, delete_after=15)
+            except:
+                # If response already sent, try followup
+                try:
+                    await interaction.followup.send("❌ An error occurred while managing panels. Please try again.", ephemeral=True, delete_after=15)
+                except:
+                    print(f"Failed to send error message to user: {e}")
 
 class AddRoleModal(discord.ui.Modal, title="Add Role to Panel"):
     def __init__(self, cog, panel_id: str):
@@ -327,36 +338,47 @@ class AddRoleModal(discord.ui.Modal, title="Add Role to Panel"):
     )
 
     async def on_submit(self, interaction: discord.Interaction):
-        role_name = self.role_name.value
-        button_label = self.button_label.value
-        emoji = self.emoji.value or ""
-        
-        # Find role by name
-        role = discord.utils.get(interaction.guild.roles, name=role_name)
-        if not role:
-            await interaction.response.send_message(f"❌ Role '{role_name}' not found! Please check the spelling.", ephemeral=True, delete_after=15)
-            return
+        try:
+            role_name = self.role_name.value
+            button_label = self.button_label.value
+            emoji = self.emoji.value or ""
+            
+            # Find role by name
+            role = discord.utils.get(interaction.guild.roles, name=role_name)
+            if not role:
+                await interaction.response.send_message(f"❌ Role '{role_name}' not found! Please check the spelling.", ephemeral=True, delete_after=15)
+                return
 
-        # Add role to panel
-        success = await self.cog.add_role_to_panel(interaction.guild.id, self.panel_id, role.id, button_label, emoji)
-        
-        if success:
-            embed = discord.Embed(
-                title="✅ Role Added!",
-                description=f"**{role.name}** has been added to the **{self.panel_id}** panel.",
-                color=COLORS['success']
-            )
-            embed.add_field(name="Button Label", value=button_label, inline=True)
-            if emoji:
-                embed.add_field(name="Emoji", value=emoji, inline=True)
-            embed.set_footer(text="Auto-deletes in 15s")
+            # Add role to panel
+            success = await self.cog.add_role_to_panel(interaction.guild.id, self.panel_id, role.id, button_label, emoji)
             
-            await interaction.response.send_message(embed=embed, ephemeral=True, delete_after=15)
-            
-            # Refresh the role panel
-            await self.cog.refresh_role_panel(interaction.guild.id, self.panel_id)
-        else:
-            await interaction.response.send_message("❌ Failed to add role. It might already exist in the panel.", ephemeral=True, delete_after=15)
+            if success:
+                embed = discord.Embed(
+                    title="✅ Role Added!",
+                    description=f"**{role.name}** has been added to the **{self.panel_id}** panel.",
+                    color=COLORS['success']
+                )
+                embed.add_field(name="Button Label", value=button_label, inline=True)
+                if emoji:
+                    embed.add_field(name="Emoji", value=emoji, inline=True)
+                embed.set_footer(text="Auto-deletes in 15s")
+                
+                await interaction.response.send_message(embed=embed, ephemeral=True, delete_after=15)
+                
+                # Refresh the role panel
+                await self.cog.refresh_role_panel(interaction.guild.id, self.panel_id)
+            else:
+                await interaction.response.send_message("❌ Failed to add role. It might already exist in the panel.", ephemeral=True, delete_after=15)
+        except Exception as e:
+            print(f"Error adding role: {e}")
+            try:
+                await interaction.response.send_message("❌ An error occurred while adding the role. Please try again.", ephemeral=True, delete_after=15)
+            except:
+                # If response already sent, try followup
+                try:
+                    await interaction.followup.send("❌ An error occurred while adding the role. Please try again.", ephemeral=True, delete_after=15)
+                except:
+                    print(f"Failed to send error message to user: {e}")
 
 class EditRoleModal(discord.ui.Modal, title="Edit Role in Panel"):
     def __init__(self, cog, panel_id: str):
@@ -386,35 +408,46 @@ class EditRoleModal(discord.ui.Modal, title="Edit Role in Panel"):
     )
 
     async def on_submit(self, interaction: discord.Interaction):
-        role_name = self.role_name.value
-        new_button_label = self.new_button_label.value
-        new_emoji = self.new_emoji.value or ""
-        
-        # Find role by name
-        role = discord.utils.get(interaction.guild.roles, name=role_name)
-        if not role:
-            await interaction.response.send_message(f"❌ Role '{role_name}' not found! Please check the spelling.", ephemeral=True, delete_after=15)
-            return
+        try:
+            role_name = self.role_name.value
+            new_button_label = self.new_button_label.value
+            new_emoji = self.new_emoji.value or ""
+            
+            # Find role by name
+            role = discord.utils.get(interaction.guild.roles, name=role_name)
+            if not role:
+                await interaction.response.send_message(f"❌ Role '{role_name}' not found! Please check the spelling.", ephemeral=True, delete_after=15)
+                return
 
-        success = await self.cog.edit_role_in_panel(interaction.guild.id, self.panel_id, role.id, new_button_label, new_emoji)
-        
-        if success:
-            embed = discord.Embed(
-                title="✅ Role Updated!",
-                description=f"Role has been updated in the **{self.panel_id}** panel.",
-                color=COLORS['success']
-            )
-            embed.add_field(name="New Button Label", value=new_button_label, inline=True)
-            if new_emoji:
-                embed.add_field(name="New Emoji", value=new_emoji, inline=True)
-            embed.set_footer(text="Auto-deletes in 15s")
+            success = await self.cog.edit_role_in_panel(interaction.guild.id, self.panel_id, role.id, new_button_label, new_emoji)
             
-            await interaction.response.send_message(embed=embed, ephemeral=True, delete_after=15)
-            
-            # Refresh the role panel
-            await self.cog.refresh_role_panel(interaction.guild.id, self.panel_id)
-        else:
-            await interaction.response.send_message("❌ Role not found in panel or failed to update.", ephemeral=True, delete_after=15)
+            if success:
+                embed = discord.Embed(
+                    title="✅ Role Updated!",
+                    description=f"Role has been updated in the **{self.panel_id}** panel.",
+                    color=COLORS['success']
+                )
+                embed.add_field(name="New Button Label", value=new_button_label, inline=True)
+                if new_emoji:
+                    embed.add_field(name="New Emoji", value=new_emoji, inline=True)
+                embed.set_footer(text="Auto-deletes in 15s")
+                
+                await interaction.response.send_message(embed=embed, ephemeral=True, delete_after=15)
+                
+                # Refresh the role panel
+                await self.cog.refresh_role_panel(interaction.guild.id, self.panel_id)
+            else:
+                await interaction.response.send_message("❌ Role not found in panel or failed to update.", ephemeral=True, delete_after=15)
+        except Exception as e:
+            print(f"Error editing role: {e}")
+            try:
+                await interaction.response.send_message("❌ An error occurred while editing the role. Please try again.", ephemeral=True, delete_after=15)
+            except:
+                # If response already sent, try followup
+                try:
+                    await interaction.followup.send("❌ An error occurred while editing the role. Please try again.", ephemeral=True, delete_after=15)
+                except:
+                    print(f"Failed to send error message to user: {e}")
 
 class RemoveRoleModal(discord.ui.Modal, title="Remove Role from Panel"):
     def __init__(self, cog, panel_id: str):
@@ -430,30 +463,41 @@ class RemoveRoleModal(discord.ui.Modal, title="Remove Role from Panel"):
     )
 
     async def on_submit(self, interaction: discord.Interaction):
-        role_name = self.role_name.value
-        
-        # Find role by name
-        role = discord.utils.get(interaction.guild.roles, name=role_name)
-        if not role:
-            await interaction.response.send_message(f"❌ Role '{role_name}' not found! Please check the spelling.", ephemeral=True, delete_after=15)
-            return
+        try:
+            role_name = self.role_name.value
+            
+            # Find role by name
+            role = discord.utils.get(interaction.guild.roles, name=role_name)
+            if not role:
+                await interaction.response.send_message(f"❌ Role '{role_name}' not found! Please check the spelling.", ephemeral=True, delete_after=15)
+                return
 
-        success = await self.cog.remove_role_from_panel(interaction.guild.id, self.panel_id, role.id)
-        
-        if success:
-            embed = discord.Embed(
-                title="✅ Role Removed!",
-                description=f"Role has been removed from the **{self.panel_id}** panel.",
-                color=COLORS['success']
-            )
-            embed.set_footer(text="Auto-deletes in 15s")
+            success = await self.cog.remove_role_from_panel(interaction.guild.id, self.panel_id, role.id)
             
-            await interaction.response.send_message(embed=embed, ephemeral=True, delete_after=15)
-            
-            # Refresh the role panel
-            await self.cog.refresh_role_panel(interaction.guild.id, self.panel_id)
-        else:
-            await interaction.response.send_message("❌ Role not found in panel or failed to remove.", ephemeral=True, delete_after=15)
+            if success:
+                embed = discord.Embed(
+                    title="✅ Role Removed!",
+                    description=f"Role has been removed from the **{self.panel_id}** panel.",
+                    color=COLORS['success']
+                )
+                embed.set_footer(text="Auto-deletes in 15s")
+                
+                await interaction.response.send_message(embed=embed, ephemeral=True, delete_after=15)
+                
+                # Refresh the role panel
+                await self.cog.refresh_role_panel(interaction.guild.id, self.panel_id)
+            else:
+                await interaction.response.send_message("❌ Role not found in panel or failed to remove.", ephemeral=True, delete_after=15)
+        except Exception as e:
+            print(f"Error removing role: {e}")
+            try:
+                await interaction.response.send_message("❌ An error occurred while removing the role. Please try again.", ephemeral=True, delete_after=15)
+            except:
+                # If response already sent, try followup
+                try:
+                    await interaction.followup.send("❌ An error occurred while removing the role. Please try again.", ephemeral=True, delete_after=15)
+                except:
+                    print(f"Failed to send error message to user: {e}")
 
 class RoleSystem(commands.Cog):
     def __init__(self, bot):
