@@ -64,21 +64,36 @@ class RolePanelView(discord.ui.View):
         # Clear existing buttons
         self.clear_items()
         
-        # Add role buttons
-        guild_id = str(self.cog.bot.guilds[0].id) if self.cog.bot.guilds else None
-        if guild_id and guild_id in self.cog.role_panels:
-            panel = self.cog.role_panels[guild_id].get(self.panel_id, {})
-            roles = panel.get('roles', [])
-            
-            for role_data in roles:
-                button = RoleButton(
-                    role_id=role_data['role_id'],
-                    label=role_data['label'],
-                    emoji=role_data['emoji'],
-                    style=discord.ButtonStyle.primary,
-                    custom_id=f"role_{self.panel_id}_{role_data['role_id']}"
-                )
-                self.add_item(button)
+        try:
+            # Add role buttons
+            guild_id = str(self.cog.bot.guilds[0].id) if self.cog.bot.guilds else None
+            if guild_id and guild_id in self.cog.role_panels:
+                guild_data = self.cog.role_panels[guild_id]
+                
+                # Ensure guild_data is a dictionary
+                if not isinstance(guild_data, dict):
+                    return
+                
+                panel = guild_data.get(self.panel_id, {})
+                if not isinstance(panel, dict):
+                    return
+                    
+                roles = panel.get('roles', [])
+                if not isinstance(roles, list):
+                    return
+                
+                for role_data in roles:
+                    if isinstance(role_data, dict) and 'role_id' in role_data and 'label' in role_data:
+                        button = RoleButton(
+                            role_id=role_data['role_id'],
+                            label=role_data['label'],
+                            emoji=role_data.get('emoji', ''),
+                            style=discord.ButtonStyle.primary,
+                            custom_id=f"role_{self.panel_id}_{role_data['role_id']}"
+                        )
+                        self.add_item(button)
+        except Exception as e:
+            print(f"Error updating buttons for panel {self.panel_id}: {e}")
 
 class AdminRoleView(discord.ui.View):
     def __init__(self, cog):
@@ -145,31 +160,41 @@ class AdminRoleView(discord.ui.View):
 
     async def show_panel_selection(self, interaction: discord.Interaction, action: str):
         """Show panel selection for role operations"""
-        guild_key = str(interaction.guild.id)
-        panels = self.cog.role_panels.get(guild_key, {})
-        
-        if not panels:
-            await interaction.response.send_message("❌ No panels exist yet! Create a panel first.", ephemeral=True, delete_after=15)
-            return
-        
-        # Create panel selection embed
-        embed = discord.Embed(
-            title=f"Select Panel for {action.title()}",
-            description="Choose which panel to manage:",
-            color=COLORS['primary']
-        )
-        
-        for panel_id, panel_data in panels.items():
-            role_count = len(panel_data.get('roles', []))
-            embed.add_field(
-                name=f"📋 {panel_data.get('name', panel_id)}",
-                value=f"ID: `{panel_id}`\nRoles: {role_count}",
-                inline=True
+        try:
+            guild_key = str(interaction.guild.id)
+            guild_data = self.cog.role_panels.get(guild_key, {})
+            
+            # Ensure guild_data is a dictionary
+            if not isinstance(guild_data, dict):
+                await interaction.response.send_message("❌ Invalid data format. Please contact an administrator.", ephemeral=True, delete_after=15)
+                return
+            
+            if not guild_data:
+                await interaction.response.send_message("❌ No panels exist yet! Create a panel first.", ephemeral=True, delete_after=15)
+                return
+            
+            # Create panel selection embed
+            embed = discord.Embed(
+                title=f"Select Panel for {action.title()}",
+                description="Choose which panel to manage:",
+                color=COLORS['primary']
             )
-        
-        # Create panel selection view
-        view = PanelSelectionView(self.cog, action)
-        await interaction.response.send_message(embed=embed, view=view, ephemeral=True, delete_after=60)
+            
+            for panel_id, panel_data in guild_data.items():
+                if isinstance(panel_data, dict):
+                    role_count = len(panel_data.get('roles', []))
+                    embed.add_field(
+                        name=f"📋 {panel_data.get('name', panel_id)}",
+                        value=f"ID: `{panel_id}`\nRoles: {role_count}",
+                        inline=True
+                    )
+            
+            # Create panel selection view
+            view = PanelSelectionView(self.cog, action)
+            await interaction.response.send_message(embed=embed, view=view, ephemeral=True, delete_after=60)
+        except Exception as e:
+            print(f"Error showing panel selection: {e}")
+            await interaction.response.send_message("❌ An error occurred while showing panel selection.", ephemeral=True, delete_after=15)
 
 class PanelSelectionView(discord.ui.View):
     def __init__(self, cog, action: str):
@@ -180,17 +205,26 @@ class PanelSelectionView(discord.ui.View):
 
     def add_panel_options(self):
         """Add panel selection options"""
-        guild_id = str(self.cog.bot.guilds[0].id) if self.cog.bot.guilds else None
-        if guild_id and guild_id in self.cog.role_panels:
-            panels = self.cog.role_panels[guild_id]
-            for panel_id, panel_data in panels.items():
-                button = discord.ui.Button(
-                    label=panel_data.get('name', panel_id),
-                    custom_id=f"select_panel_{panel_id}_{self.action}",
-                    style=discord.ButtonStyle.primary
-                )
-                button.callback = self.panel_selected
-                self.add_item(button)
+        try:
+            guild_id = str(self.cog.bot.guilds[0].id) if self.cog.bot.guilds else None
+            if guild_id and guild_id in self.cog.role_panels:
+                guild_data = self.cog.role_panels[guild_id]
+                
+                # Ensure guild_data is a dictionary
+                if not isinstance(guild_data, dict):
+                    return
+                
+                for panel_id, panel_data in guild_data.items():
+                    if isinstance(panel_data, dict):
+                        button = discord.ui.Button(
+                            label=panel_data.get('name', panel_id),
+                            custom_id=f"select_panel_{panel_id}_{self.action}",
+                            style=discord.ButtonStyle.primary
+                        )
+                        button.callback = self.panel_selected
+                        self.add_item(button)
+        except Exception as e:
+            print(f"Error adding panel options: {e}")
 
     async def panel_selected(self, interaction: discord.Interaction):
         """Handle panel selection"""
@@ -436,10 +470,44 @@ class RoleSystem(commands.Cog):
         if os.path.exists(self.data_file):
             try:
                 with open(self.data_file, 'r') as f:
-                    return json.load(f)
+                    data = json.load(f)
+                    
+                # Migrate old data format to new format
+                migrated_data = self.migrate_old_data(data)
+                return migrated_data
             except:
                 return {}
         return {}
+
+    def migrate_old_data(self, data):
+        """Migrate old data format to new format"""
+        migrated_data = {}
+        
+        for guild_key, guild_data in data.items():
+            if isinstance(guild_data, list):
+                # Old format: guild_data is a list of roles
+                # Convert to new format with a default 'main' panel
+                migrated_data[guild_key] = {
+                    'main': {
+                        'name': 'Main Role Panel',
+                        'roles': guild_data,
+                        'created_at': datetime.now().isoformat(),
+                        'migrated': True
+                    }
+                }
+            elif isinstance(guild_data, dict):
+                # New format: guild_data is a dict of panels
+                migrated_data[guild_key] = guild_data
+            else:
+                # Invalid format, skip this guild
+                continue
+        
+        # Save migrated data
+        if migrated_data != data:
+            self.role_panels = migrated_data
+            self.save_role_panels()
+        
+        return migrated_data
 
     def save_role_panels(self):
         """Save role panel data to JSON file"""
@@ -701,76 +769,118 @@ class RoleSystem(commands.Cog):
 
     async def list_all_panels_command(self, interaction: discord.Interaction):
         """List all panels and their roles (called from admin panel)"""
-        guild_key = str(interaction.guild.id)
-        panels = self.role_panels.get(guild_key, {})
-        
-        if not panels:
-            embed = discord.Embed(
-                title="📊 All Role Panels",
-                description="No panels have been created yet.",
-                color=COLORS['info']
-            )
-        else:
-            embed = discord.Embed(
-                title="📊 All Role Panels",
-                description=f"Found {len(panels)} panel(s):",
-                color=COLORS['primary']
-            )
+        try:
+            guild_key = str(interaction.guild.id)
+            guild_data = self.role_panels.get(guild_key, {})
             
-            for panel_id, panel_data in panels.items():
-                roles = panel_data.get('roles', [])
-                panel_name = panel_data.get('name', panel_id.title())
+            # Ensure guild_data is a dictionary
+            if not isinstance(guild_data, dict):
+                embed = discord.Embed(
+                    title="📊 All Role Panels",
+                    description="❌ Invalid data format. Please contact an administrator.",
+                    color=COLORS['error']
+                )
+                embed.set_footer(text="Auto-deletes in 45s")
+                await interaction.response.send_message(embed=embed, ephemeral=True, delete_after=45)
+                return
+            
+            if not guild_data:
+                embed = discord.Embed(
+                    title="📊 All Role Panels",
+                    description="No panels have been created yet.",
+                    color=COLORS['info']
+                )
+            else:
+                embed = discord.Embed(
+                    title="📊 All Role Panels",
+                    description=f"Found {len(guild_data)} panel(s):",
+                    color=COLORS['primary']
+                )
                 
-                if roles:
-                    role_list = "\n".join([f"• {role['emoji']} {role['label']}" for role in roles])
-                    embed.add_field(
-                        name=f"📋 {panel_name}",
-                        value=f"ID: `{panel_id}`\nRoles ({len(roles)}):\n{role_list}",
-                        inline=False
-                    )
-                else:
-                    embed.add_field(
-                        name=f"📋 {panel_name}",
-                        value=f"ID: `{panel_id}`\nNo roles configured",
-                        inline=False
-                    )
-        
-        embed.set_footer(text="Auto-deletes in 45s")
-        await interaction.response.send_message(embed=embed, ephemeral=True, delete_after=45)
+                for panel_id, panel_data in guild_data.items():
+                    if isinstance(panel_data, dict):
+                        roles = panel_data.get('roles', [])
+                        panel_name = panel_data.get('name', panel_id.title())
+                        
+                        if roles and isinstance(roles, list):
+                            role_list = "\n".join([f"• {role.get('emoji', '')} {role.get('label', 'Unknown')}" for role in roles if isinstance(role, dict)])
+                            embed.add_field(
+                                name=f"📋 {panel_name}",
+                                value=f"ID: `{panel_id}`\nRoles ({len(roles)}):\n{role_list}",
+                                inline=False
+                            )
+                        else:
+                            embed.add_field(
+                                name=f"📋 {panel_name}",
+                                value=f"ID: `{panel_id}`\nNo roles configured",
+                                inline=False
+                            )
+            
+            embed.set_footer(text="Auto-deletes in 45s")
+            await interaction.response.send_message(embed=embed, ephemeral=True, delete_after=45)
+        except Exception as e:
+            print(f"Error listing panels: {e}")
+            embed = discord.Embed(
+                title="📊 All Role Panels",
+                description="❌ An error occurred while listing panels.",
+                color=COLORS['error']
+            )
+            embed.set_footer(text="Auto-deletes in 45s")
+            await interaction.response.send_message(embed=embed, ephemeral=True, delete_after=45)
 
     @commands.Cog.listener()
     async def on_ready(self):
         """Recreate role panels when bot restarts"""
         for guild in self.bot.guilds:
-            guild_key = str(guild.id)
-            if guild_key in self.role_panels:
-                for panel_id, panel_data in self.role_panels[guild_key].items():
-                    # Try to find existing panel message
-                    panel_found = False
+            try:
+                guild_key = str(guild.id)
+                if guild_key in self.role_panels:
+                    guild_data = self.role_panels[guild_key]
                     
-                    # Check if we have a stored message ID
-                    if guild_key in self.panel_messages and panel_id in self.panel_messages[guild_key]:
-                        message_id = self.panel_messages[guild_key][panel_id]
-                        
-                        # Try to find the message
-                        for channel in guild.text_channels:
-                            try:
-                                message = await channel.fetch_message(message_id)
-                                if message:
-                                    # Update the view to make it functional again
-                                    view = RolePanelView(self, panel_id)
-                                    await message.edit(view=view)
-                                    panel_found = True
-                                    break
-                            except:
+                    # Ensure guild_data is a dictionary
+                    if not isinstance(guild_data, dict):
+                        print(f"Warning: Invalid data format for guild {guild.name}, skipping...")
+                        continue
+                    
+                    for panel_id, panel_data in guild_data.items():
+                        try:
+                            # Ensure panel_data has the expected structure
+                            if not isinstance(panel_data, dict) or 'roles' not in panel_data:
+                                print(f"Warning: Invalid panel data for {panel_id} in guild {guild.name}, skipping...")
                                 continue
-                    
-                    # If no panel found, create a new one in the first available channel
-                    if not panel_found:
-                        for channel in guild.text_channels:
-                            if channel.permissions_for(guild.me).send_messages:
-                                await self.create_role_panel(guild.id, channel.id, panel_id)
-                                break
+                            
+                            # Try to find existing panel message
+                            panel_found = False
+                            
+                            # Check if we have a stored message ID
+                            if guild_key in self.panel_messages and panel_id in self.panel_messages[guild_key]:
+                                message_id = self.panel_messages[guild_key][panel_id]
+                                
+                                # Try to find the message
+                                for channel in guild.text_channels:
+                                    try:
+                                        message = await channel.fetch_message(message_id)
+                                        if message:
+                                            # Update the view to make it functional again
+                                            view = RolePanelView(self, panel_id)
+                                            await message.edit(view=view)
+                                            panel_found = True
+                                            break
+                                    except:
+                                        continue
+                            
+                            # If no panel found, create a new one in the first available channel
+                            if not panel_found:
+                                for channel in guild.text_channels:
+                                    if channel.permissions_for(guild.me).send_messages:
+                                        await self.create_role_panel(guild.id, channel.id, panel_id)
+                                        break
+                        except Exception as e:
+                            print(f"Error processing panel {panel_id} in guild {guild.name}: {e}")
+                            continue
+            except Exception as e:
+                print(f"Error processing guild {guild.name}: {e}")
+                continue
 
 async def setup(bot):
     await bot.add_cog(RoleSystem(bot))
