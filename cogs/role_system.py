@@ -728,6 +728,210 @@ class RoleSystem(commands.Cog):
         else:
             await ctx.send("❌ Failed to create role panel!", delete_after=10)
 
+    @commands.command(name='displaypanel')
+    @commands.has_permissions(administrator=True)
+    async def display_panel_command(self, ctx, panel_id: str, channel: discord.TextChannel = None):
+        """Display an existing role panel in the current or specified channel"""
+        if not channel:
+            channel = ctx.channel
+        
+        guild_key = str(ctx.guild.id)
+        if guild_key not in self.role_panels or panel_id not in self.role_panels[guild_key]:
+            await ctx.send(f"❌ Panel '{panel_id}' doesn't exist! Create it first with `!createrolepanel {panel_id}`", delete_after=15)
+            return
+        
+        # Check if panel is already displayed in this channel
+        if guild_key in self.panel_messages and panel_id in self.panel_messages[guild_key]:
+            try:
+                old_message_id = self.panel_messages[guild_key][panel_id]
+                old_channel = None
+                
+                # Find the old message
+                for ch in ctx.guild.text_channels:
+                    try:
+                        old_message = await ch.fetch_message(old_message_id)
+                        if old_message:
+                            old_channel = ch
+                            break
+                    except:
+                        continue
+                
+                if old_channel and old_channel.id != channel.id:
+                    # Ask if user wants to move the panel
+                    embed = discord.Embed(
+                        title="⚠️ Panel Already Displayed",
+                        description=f"Panel '{panel_id}' is already displayed in {old_channel.mention}",
+                        color=COLORS['warning']
+                    )
+                    embed.add_field(
+                        name="Options",
+                        value="1. Use `!movepanel {panel_id} {channel.mention}` to move it\n2. Use `!removepanel {panel_id}` to remove it first",
+                        inline=False
+                    )
+                    await ctx.send(embed=embed, delete_after=20)
+                    return
+                elif old_channel and old_channel.id == channel.id:
+                    await ctx.send(f"✅ Panel '{panel_id}' is already displayed in {channel.mention}", delete_after=10)
+                    return
+            except:
+                pass
+        
+        # Create/display the panel
+        message = await self.create_role_panel(ctx.guild.id, channel.id, panel_id)
+        
+        if message:
+            embed = discord.Embed(
+                title="✅ Role Panel Displayed!",
+                description=f"Role assignment panel for **{panel_id}** is now visible in {channel.mention}",
+                color=COLORS['success']
+            )
+            embed.add_field(
+                name="Next Steps",
+                value="Use the admin panel to add roles to this panel!",
+                inline=False
+            )
+            await ctx.send(embed=embed, delete_after=15)
+        else:
+            await ctx.send("❌ Failed to display role panel!", delete_after=10)
+
+    @commands.command(name='movepanel')
+    @commands.has_permissions(administrator=True)
+    async def move_panel_command(self, ctx, panel_id: str, new_channel: discord.TextChannel):
+        """Move a role panel to a different channel"""
+        guild_key = str(ctx.guild.id)
+        if guild_key not in self.role_panels or panel_id not in self.role_panels[guild_key]:
+            await ctx.send(f"❌ Panel '{panel_id}' doesn't exist!", delete_after=15)
+            return
+        
+        # Remove old panel message
+        if guild_key in self.panel_messages and panel_id in self.panel_messages[guild_key]:
+            old_message_id = self.panel_messages[guild_key][panel_id]
+            
+            # Try to delete the old message
+            for ch in ctx.guild.text_channels:
+                try:
+                    old_message = await ch.fetch_message(old_message_id)
+                    if old_message:
+                        await old_message.delete()
+                        break
+                except:
+                    continue
+        
+        # Create panel in new channel
+        message = await self.create_role_panel(ctx.guild.id, new_channel.id, panel_id)
+        
+        if message:
+            embed = discord.Embed(
+                title="✅ Role Panel Moved!",
+                description=f"Role assignment panel for **{panel_id}** has been moved to {new_channel.mention}",
+                color=COLORS['success']
+            )
+            await ctx.send(embed=embed, delete_after=15)
+        else:
+            await ctx.send("❌ Failed to move role panel!", delete_after=10)
+
+    @commands.command(name='removepanel')
+    @commands.has_permissions(administrator=True)
+    async def remove_panel_display_command(self, ctx, panel_id: str):
+        """Remove a role panel display (but keep the panel data)"""
+        guild_key = str(ctx.guild.id)
+        if guild_key not in self.panel_messages or panel_id not in self.panel_messages[guild_key]:
+            await ctx.send(f"❌ Panel '{panel_id}' is not currently displayed anywhere!", delete_after=15)
+            return
+        
+        message_id = self.panel_messages[guild_key][panel_id]
+        message_deleted = False
+        
+        # Try to delete the message
+        for channel in ctx.guild.text_channels:
+            try:
+                message = await channel.fetch_message(message_id)
+                if message:
+                    await message.delete()
+                    message_deleted = True
+                    break
+            except:
+                continue
+        
+        if message_deleted:
+            # Remove from panel_messages
+            del self.panel_messages[guild_key][panel_id]
+            
+            embed = discord.Embed(
+                title="✅ Panel Display Removed!",
+                description=f"Role panel '{panel_id}' is no longer displayed, but the panel data is preserved.",
+                color=COLORS['success']
+            )
+            embed.add_field(
+                name="To Display Again",
+                value=f"Use `!displaypanel {panel_id} [channel]`",
+                inline=False
+            )
+            await ctx.send(embed=embed, delete_after=15)
+        else:
+            await ctx.send(f"❌ Failed to remove panel display for '{panel_id}'", delete_after=15)
+
+    @commands.command(name='listpanels')
+    @commands.has_permissions(administrator=True)
+    async def list_panels_command(self, ctx):
+        """List all role panels and where they're displayed"""
+        guild_key = str(ctx.guild.id)
+        panels = self.role_panels.get(guild_key, {})
+        panel_messages = self.panel_messages.get(guild_key, {})
+        
+        if not panels:
+            embed = discord.Embed(
+                title="📋 Role Panels",
+                description="No role panels have been created yet.",
+                color=COLORS['info']
+            )
+        else:
+            embed = discord.Embed(
+                title="📋 Role Panels",
+                description=f"Found {len(panels)} panel(s):",
+                color=COLORS['primary']
+            )
+            
+            for panel_id, panel_data in panels.items():
+                roles = panel_data.get('roles', [])
+                panel_name = panel_data.get('name', panel_id.title())
+                
+                # Check if panel is displayed
+                if panel_id in panel_messages:
+                    message_id = panel_messages[panel_id]
+                    channel_info = "Unknown channel"
+                    
+                    # Find which channel it's in
+                    for channel in ctx.guild.text_channels:
+                        try:
+                            message = await channel.fetch_message(message_id)
+                            if message:
+                                channel_info = channel.mention
+                                break
+                        except:
+                            continue
+                    
+                    status = f"✅ Displayed in {channel_info}"
+                else:
+                    status = "❌ Not displayed"
+                
+                if roles:
+                    role_count = len(roles)
+                    embed.add_field(
+                        name=f"📋 {panel_name}",
+                        value=f"ID: `{panel_id}`\nStatus: {status}\nRoles: {role_count}",
+                        inline=True
+                    )
+                else:
+                    embed.add_field(
+                        name=f"📋 {panel_name}",
+                        value=f"ID: `{panel_id}`\nStatus: {status}\nNo roles configured",
+                        inline=True
+                    )
+        
+        embed.set_footer(text="Use !displaypanel <id> [channel] to show panels")
+        await ctx.send(embed=embed, delete_after=60)
+
     @commands.command(name='adminrolepanel')
     @commands.has_permissions(administrator=True)
     async def admin_role_panel_command(self, ctx):

@@ -70,6 +70,10 @@ Use `!help` to see all available commands in Discord!
 
 ### 🎭 Role System Commands
 - `!createrolepanel <panel_id> [channel]` - Create a role assignment panel (e.g., `!createrolepanel games`) (Admin only)
+- `!displaypanel <panel_id> [channel]` - Display an existing panel in a channel (Admin only)
+- `!movepanel <panel_id> <channel>` - Move a panel to a different channel (Admin only)
+- `!removepanel <panel_id>` - Remove panel display (keeps data) (Admin only)
+- `!listpanels` - List all panels and their display status (Admin only)
 - `!adminrolepanel` - Open the role management admin panel (Admin only)
 
 ## File Structure
