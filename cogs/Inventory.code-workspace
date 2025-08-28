@@ -1,0 +1,8 @@
+{
+	"folders": [
+		{
+			"name": "SSH FS - Inventory",
+			"uri": "ssh://inventory/home/newinv/Inventory"
+		}
+	]
+}

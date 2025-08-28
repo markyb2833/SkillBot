@@ -19,6 +19,12 @@ A feature-rich Discord bot with games, integrations, and a group finder system!
 - **Random Choice** (`!choose option1 option2 option3`)
 - **Reminders** (`!remind <minutes> <message>`)
 
+### 🎭 Role Management System
+- **Interactive Role Assignment** - Click buttons to get/remove roles
+- **Admin Management** - Create, edit, and remove role buttons
+- **Persistent Panels** - Role panels automatically recover after bot restarts
+- **Customizable Display** - Set custom labels and emojis for each role
+
 ### 👥 Group Finder System
 - **Create Groups** (`!creategroup <activity> [max_size] [description]`)
 - **Join Groups** (`!joingroup <group_id>`)
@@ -60,6 +66,10 @@ A feature-rich Discord bot with games, integrations, and a group finder system!
 
 Use `!help` to see all available commands in Discord!
 
+### 🎭 Role System Commands
+- `!createrolepanel [channel]` - Create a role assignment panel (Admin only)
+- `!adminrolepanel` - Open the role management admin panel (Admin only)
+
 ## File Structure
 
 ```
@@ -70,9 +80,11 @@ discord-bot/
 ├── cogs/              # Bot modules
 │   ├── games.py       # Game commands
 │   ├── group_finder.py # Group finder system
-│   └── integrations.py # Fun integrations
+│   ├── integrations.py # Fun integrations
+│   └── role_system.py # Role management system
 └── data/              # Data storage (auto-created)
-    └── groups.json    # Group data
+    ├── groups.json    # Group data
+    └── role_system.json # Role system data
 ```
 
 ## Customization
