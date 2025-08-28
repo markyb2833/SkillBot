@@ -20,10 +20,12 @@ A feature-rich Discord bot with games, integrations, and a group finder system!
 - **Reminders** (`!remind <minutes> <message>`)
 
 ### 🎭 Role Management System
+- **Multiple Panel Support** - Create separate panels for games, age, gender, etc.
 - **Interactive Role Assignment** - Click buttons to get/remove roles
-- **Admin Management** - Create, edit, and remove role buttons
+- **Admin Management** - Create, edit, and remove role buttons and panels
 - **Persistent Panels** - Role panels automatically recover after bot restarts
 - **Customizable Display** - Set custom labels and emojis for each role
+- **Role Name Input** - Add roles by typing their names instead of copying IDs
 
 ### 👥 Group Finder System
 - **Create Groups** (`!creategroup <activity> [max_size] [description]`)
@@ -67,7 +69,7 @@ A feature-rich Discord bot with games, integrations, and a group finder system!
 Use `!help` to see all available commands in Discord!
 
 ### 🎭 Role System Commands
-- `!createrolepanel [channel]` - Create a role assignment panel (Admin only)
+- `!createrolepanel <panel_id> [channel]` - Create a role assignment panel (e.g., `!createrolepanel games`) (Admin only)
 - `!adminrolepanel` - Open the role management admin panel (Admin only)
 
 ## File Structure
