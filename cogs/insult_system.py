@@ -114,29 +114,30 @@ class InsultSystem(commands.Cog):
 
     def generate_insult(self, user_mention, tier, guild_id=None):
         """Generate an insult for a user"""
-        # Try custom insults first
+        # Try custom insults first (only if they actually exist and have content)
         if guild_id:
             guild_insults = self.get_guild_insults(guild_id)
-            if guild_insults[tier]:
+            if guild_insults[tier] and len(guild_insults[tier]) > 0:
                 insult = random.choice(guild_insults[tier])
+                print(f"DEBUG: Using CUSTOM insult from {len(guild_insults[tier])} options")
                 # Check if insult has {user} tag, if so format it, otherwise return as-is
                 if '{user}' in insult:
                     return insult.format(user=user_mention)
                 else:
                     return insult
         
-        # Fall back to default insults
+        # Always fall back to default insults if available
         if tier in self.default_insults and self.default_insults[tier]:
             # Ensure we have multiple insults to choose from
             available_insults = self.default_insults[tier]
             if len(available_insults) > 1:
                 # Use random.choice for variety
                 insult = random.choice(available_insults)
-                print(f"DEBUG: Selected insult from {len(available_insults)} options: {insult[:50]}...")
+                print(f"DEBUG: Using DEFAULT insult from {len(available_insults)} options: {insult[:50]}...")
             else:
                 # If only one insult, use it
                 insult = available_insults[0]
-                print(f"DEBUG: Only one insult available for {tier} tier: {insult[:50]}...")
+                print(f"DEBUG: Only one DEFAULT insult available for {tier} tier: {insult[:50]}...")
             
             # Check if insult has {user} tag, if so format it, otherwise return as-is
             if '{user}' in insult:
@@ -145,6 +146,7 @@ class InsultSystem(commands.Cog):
                 return insult
         
         # Final fallback
+        print(f"DEBUG: Using FALLBACK insult for {tier} tier")
         return f"Hey {user_mention}, you're not very bright, are you?"
 
     @commands.command(name='insulton')
@@ -646,6 +648,12 @@ class InsultSystem(commands.Cog):
         embed.add_field(
             name="🔍 Random Selection",
             value=f"Random seed: {random.getrandbits(32)}",
+            inline=False
+        )
+        
+        embed.add_field(
+            name="📁 File Sources",
+            value=f"**Default insults loaded:** {len(self.default_insults.get('mild', [])) + len(self.default_insults.get('strong', [])) + len(self.default_insults.get('cruel', []))} total\n**Custom insults loaded:** {len(self.custom_insults.get(str(ctx.guild.id), {}).get('mild', [])) + len(self.custom_insults.get(str(ctx.guild.id), {}).get('strong', [])) + len(self.custom_insults.get(str(ctx.guild.id), {}).get('cruel', []))} total",
             inline=False
         )
         
