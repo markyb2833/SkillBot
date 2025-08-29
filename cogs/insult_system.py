@@ -159,14 +159,18 @@ class InsultSystem(commands.Cog):
             user = user_or_tier
             if tier is None:
                 tier = 'mild'
+            elif tier.lower() not in ['mild', 'strong', 'cruel']:
+                await ctx.send("❌ Invalid tier! Use: mild, strong, or cruel")
+                return
+            print(f"DEBUG: User format detected - User: {user.name}, Tier: {tier}")
         else:
             # Format: !insulton "trigger" [tier] (for everyone)
             user = None
             tier = user_or_tier
-        
-        if tier.lower() not in ['mild', 'strong', 'cruel']:
-            await ctx.send("❌ Invalid tier! Use: mild, strong, or cruel")
-            return
+            if tier.lower() not in ['mild', 'strong', 'cruel']:
+                await ctx.send("❌ Invalid tier! Use: mild, strong, or cruel")
+                return
+            print(f"DEBUG: Everyone format detected - Tier: {tier}")
         
         guild_key = str(ctx.guild.id)
         if guild_key not in self.tracked_triggers:
@@ -672,18 +676,31 @@ class InsultSystem(commands.Cog):
         
         # Check each trigger
         for trigger, data in self.tracked_triggers[guild_key].items():
-            if trigger.lower() in message.content.lower():
+            # Enhanced trigger detection for emojis and text
+            should_trigger = False
+            
+            # Check for exact emoji match (custom server emojis)
+            if trigger.startswith('<:') or trigger.startswith('<a:'):
+                # Custom emoji format: <:name:id> or <a:name:id>
+                if trigger in message.content:
+                    should_trigger = True
+            else:
+                # Regular text or unicode emoji
+                if trigger.lower() in message.content.lower():
+                    should_trigger = True
+            
+            if should_trigger:
                 # Check if this trigger applies to this user
-                should_trigger = False
+                user_should_trigger = False
                 
                 if data['user_id'] is None:
                     # Trigger for everyone
-                    should_trigger = True
+                    user_should_trigger = True
                 elif message.author.id == data['user_id']:
                     # Trigger for specific user
-                    should_trigger = True
+                    user_should_trigger = True
                 
-                if should_trigger:
+                if user_should_trigger:
                     # Increment trigger count
                     data['trigger_count'] += 1
                     self.save_data()
@@ -700,6 +717,73 @@ class InsultSystem(commands.Cog):
                     
                     # Only trigger once per message
                     break
+
+    @commands.command(name='testinsulton')
+    async def test_insulton(self, ctx, trigger: str, user_or_tier, tier: str = None):
+        """Test the insulton command parameter parsing without actually setting up tracking"""
+        embed = discord.Embed(
+            title="🧪 Insulton Parameter Test",
+            description="Testing parameter parsing:",
+            color=COLORS['info']
+        )
+        
+        embed.add_field(name="Trigger", value=f"`{trigger}`", inline=True)
+        embed.add_field(name="Second Param", value=f"`{user_or_tier}`", inline=True)
+        embed.add_field(name="Third Param", value=f"`{tier}`", inline=True)
+        
+        # Determine if second parameter is a user or tier
+        if isinstance(user_or_tier, discord.Member):
+            embed.add_field(name="Format Detected", value="User-specific tracking", inline=True)
+            embed.add_field(name="User", value=user_or_tier.mention, inline=True)
+            embed.add_field(name="Tier", value=tier or 'mild (default)', inline=True)
+        else:
+            embed.add_field(name="Format Detected", value="Everyone tracking", inline=True)
+            embed.add_field(name="User", value="Everyone", inline=True)
+            embed.add_field(name="Tier", value=user_or_tier, inline=True)
+        
+        await ctx.send(embed=embed, delete_after=30)
+
+    @commands.command(name='getemojiformat')
+    async def get_emoji_format(self, ctx, emoji_input: str):
+        """Get the correct format for tracking an emoji. Usage: !getemojiformat 😀 or !getemojiformat :emoji_name:"""
+        embed = discord.Embed(
+            title="🔍 Emoji Format Helper",
+            description="Here's how to track this emoji:",
+            color=COLORS['info']
+        )
+        
+        # Check if it's a custom server emoji
+        if emoji_input.startswith('<:') or emoji_input.startswith('<a:'):
+            embed.add_field(
+                name="✅ Custom Server Emoji",
+                value=f"Use this exact format:\n`{emoji_input}`",
+                inline=False
+            )
+            embed.add_field(
+                name="📝 Command Example",
+                value=f"`!insulton \"{emoji_input}\" [tier]`",
+                inline=False
+            )
+        else:
+            # Unicode emoji or emoji name
+            embed.add_field(
+                name="✅ Unicode Emoji",
+                value=f"Use this format:\n`{emoji_input}`",
+                inline=False
+            )
+            embed.add_field(
+                name="📝 Command Example",
+                value=f"`!insulton \"{emoji_input}\" [tier]`",
+                inline=False
+            )
+        
+        embed.add_field(
+            name="💡 Pro Tips",
+            value="• **Unicode emojis** (😀, 🎮) work with simple copy-paste\n• **Custom emojis** need the full format with ID\n• **Emoji names** (:smile:) work if they're standard Discord emojis",
+            inline=False
+        )
+        
+        await ctx.send(embed=embed, delete_after=60)
 
 async def setup(bot):
     await bot.add_cog(InsultSystem(bot))

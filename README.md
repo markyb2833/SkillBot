@@ -102,6 +102,8 @@ Use `!help` to see all available commands in Discord!
 - `!insulthelp` - Show comprehensive help for the insult system
 - `!insultexamples` - Show examples of different insult formats
 - `!insultdebug [tier]` - Debug command to check available insults (Admin only)
+- `!getemojiformat <emoji>` - Get the correct format for tracking emojis
+- `!testinsulton <trigger> <user_or_tier> [tier]` - Test parameter parsing without setting up tracking
 
 ## File Structure
 
