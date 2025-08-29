@@ -126,8 +126,18 @@ class InsultSystem(commands.Cog):
                     return insult
         
         # Fall back to default insults
-        if tier in self.default_insults:
-            insult = random.choice(self.default_insults[tier])
+        if tier in self.default_insults and self.default_insults[tier]:
+            # Ensure we have multiple insults to choose from
+            available_insults = self.default_insults[tier]
+            if len(available_insults) > 1:
+                # Use random.choice for variety
+                insult = random.choice(available_insults)
+                print(f"DEBUG: Selected insult from {len(available_insults)} options: {insult[:50]}...")
+            else:
+                # If only one insult, use it
+                insult = available_insults[0]
+                print(f"DEBUG: Only one insult available for {tier} tier: {insult[:50]}...")
+            
             # Check if insult has {user} tag, if so format it, otherwise return as-is
             if '{user}' in insult:
                 return insult.format(user=user_mention)
@@ -139,8 +149,19 @@ class InsultSystem(commands.Cog):
 
     @commands.command(name='insulton')
     @commands.has_permissions(manage_messages=True)
-    async def insult_on(self, ctx, trigger: str, user: discord.Member, tier: str = 'mild'):
-        """Set up insult tracking for a phrase/emoji. Usage: !insulton "trigger" @user [tier]"""
+    async def insult_on(self, ctx, trigger: str, user_or_tier, tier: str = None):
+        """Set up insult tracking for a phrase/emoji. Usage: !insulton "trigger" @user [tier] OR !insulton "trigger" [tier] for everyone"""
+        # Determine if second parameter is a user or tier
+        if isinstance(user_or_tier, discord.Member):
+            # Format: !insulton "trigger" @user [tier]
+            user = user_or_tier
+            if tier is None:
+                tier = 'mild'
+        else:
+            # Format: !insulton "trigger" [tier] (for everyone)
+            user = None
+            tier = user_or_tier
+        
         if tier.lower() not in ['mild', 'strong', 'cruel']:
             await ctx.send("❌ Invalid tier! Use: mild, strong, or cruel")
             return
@@ -151,7 +172,7 @@ class InsultSystem(commands.Cog):
         
         # Store the trigger
         self.tracked_triggers[guild_key][trigger.lower()] = {
-            'user_id': user.id,
+            'user_id': user.id if user else None,  # None means everyone
             'tier': tier.lower(),
             'added_by': ctx.author.id,
             'added_at': datetime.now().isoformat(),
@@ -160,14 +181,26 @@ class InsultSystem(commands.Cog):
         
         self.save_data()
         
-        embed = discord.Embed(
-            title="🎯 Insult Tracking Activated!",
-            description=f"Now tracking **{trigger}** for {user.mention}",
-            color=COLORS['success']
-        )
-        embed.add_field(name="Tier", value=tier.title(), inline=True)
-        embed.add_field(name="Added By", value=ctx.author.mention, inline=True)
-        embed.add_field(name="Next Steps", value="The user will be insulted whenever they use this trigger!", inline=False)
+        if user:
+            # Specific user tracking
+            embed = discord.Embed(
+                title="🎯 Insult Tracking Activated!",
+                description=f"Now tracking **{trigger}** for {user.mention}",
+                color=COLORS['success']
+            )
+            embed.add_field(name="Tier", value=tier.title(), inline=True)
+            embed.add_field(name="Added By", value=ctx.author.mention, inline=True)
+            embed.add_field(name="Next Steps", value="The user will be insulted whenever they use this trigger!", inline=False)
+        else:
+            # Everyone tracking
+            embed = discord.Embed(
+                title="🎯 Insult Tracking Activated!",
+                description=f"Now tracking **{trigger}** for everyone",
+                color=COLORS['success']
+            )
+            embed.add_field(name="Tier", value=tier.title(), inline=True)
+            embed.add_field(name="Added By", value=ctx.author.mention, inline=True)
+            embed.add_field(name="Next Steps", value="Anyone will be insulted whenever they use this trigger!", inline=False)
         
         await ctx.send(embed=embed, delete_after=15)
 
@@ -213,12 +246,17 @@ class InsultSystem(commands.Cog):
             )
             
             for trigger, data in triggers.items():
-                user = ctx.guild.get_member(data['user_id'])
-                user_mention = user.mention if user else f"<@{data['user_id']}>"
+                if data['user_id'] is None:
+                    # Trigger for everyone
+                    target_info = "Everyone"
+                else:
+                    # Trigger for specific user
+                    user = ctx.guild.get_member(data['user_id'])
+                    target_info = user.mention if user else f"<@{data['user_id']}>"
                 
                 embed.add_field(
                     name=f"🎯 {trigger}",
-                    value=f"Target: {user_mention}\nTier: {data['tier'].title()}\nTriggers: {data['trigger_count']}",
+                    value=f"Target: {target_info}\nTier: {data['tier'].title()}\nTriggers: {data['trigger_count']}",
                     inline=True
                 )
         
@@ -498,7 +536,7 @@ class InsultSystem(commands.Cog):
         
         embed.add_field(
             name="🚀 Getting Started",
-            value="1. Use `!insulton \"phrase\" @user [tier]` to start tracking\n2. The bot will automatically insult the user when they use that phrase\n3. Choose from: mild, strong, or cruel tiers",
+            value="1. Use `!insulton \"phrase\" @user [tier]` to track a specific user\n2. Use `!insulton \"phrase\" [tier]` to track everyone\n3. The bot will automatically insult when the phrase is used\n4. Choose from: mild, strong, or cruel tiers",
             inline=False
         )
         
@@ -550,8 +588,68 @@ class InsultSystem(commands.Cog):
             inline=False
         )
         
+        embed.add_field(
+            name="🎯 Trigger Examples",
+            value="• `!insulton \"hello\" @user mild` - Track specific user\n• `!insulton \"hello\" mild` - Track everyone\n• `!insulton \"😀\" strong` - Track emoji for everyone",
+            inline=False
+        )
+        
         embed.set_footer(text="Use !adddefaultinsult to add your own insults!")
         await ctx.send(embed=embed, delete_after=90)
+
+    @commands.command(name='insultdebug')
+    async def insult_debug(self, ctx, tier: str = None):
+        """Debug command to check available insults for a tier"""
+        if tier and tier.lower() not in ['mild', 'strong', 'cruel']:
+            await ctx.send("❌ Invalid tier! Use: mild, strong, or cruel")
+            return
+        
+        embed = discord.Embed(
+            title="🐛 Insult Debug Information",
+            color=COLORS['info']
+        )
+        
+        if tier:
+            # Show specific tier
+            tier = tier.lower()
+            default_count = len(self.default_insults.get(tier, []))
+            guild_insults = self.get_guild_insults(ctx.guild.id)
+            custom_count = len(guild_insults.get(tier, []))
+            
+            embed.add_field(
+                name=f"🎭 {tier.title()} Tier",
+                value=f"**Default Insults:** {default_count}\n**Custom Insults:** {custom_count}\n**Total Available:** {default_count + custom_count}",
+                inline=False
+            )
+            
+            if default_count > 0:
+                embed.add_field(
+                    name="📝 Default Insults",
+                    value="\n".join([f"• {insult}" for insult in self.default_insults[tier][:5]]),
+                    inline=False
+                )
+                if default_count > 5:
+                    embed.add_field(name="...", value=f"And {default_count - 5} more", inline=False)
+        else:
+            # Show all tiers
+            for tier_name in ['mild', 'strong', 'cruel']:
+                default_count = len(self.default_insults.get(tier_name, []))
+                guild_insults = self.get_guild_insults(ctx.guild.id)
+                custom_count = len(guild_insults.get(tier_name, []))
+                
+                embed.add_field(
+                    name=f"🎭 {tier_name.title()} Tier",
+                    value=f"Default: {default_count} | Custom: {custom_count} | Total: {default_count + custom_count}",
+                    inline=True
+                )
+        
+        embed.add_field(
+            name="🔍 Random Selection",
+            value=f"Random seed: {random.getrandbits(32)}",
+            inline=False
+        )
+        
+        await ctx.send(embed=embed, delete_after=60)
 
     @commands.Cog.listener()
     async def on_message(self, message):
@@ -567,8 +665,17 @@ class InsultSystem(commands.Cog):
         # Check each trigger
         for trigger, data in self.tracked_triggers[guild_key].items():
             if trigger.lower() in message.content.lower():
-                # Check if the message author is the target
-                if message.author.id == data['user_id']:
+                # Check if this trigger applies to this user
+                should_trigger = False
+                
+                if data['user_id'] is None:
+                    # Trigger for everyone
+                    should_trigger = True
+                elif message.author.id == data['user_id']:
+                    # Trigger for specific user
+                    should_trigger = True
+                
+                if should_trigger:
                     # Increment trigger count
                     data['trigger_count'] += 1
                     self.save_data()
