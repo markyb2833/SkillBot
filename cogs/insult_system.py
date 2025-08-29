@@ -576,19 +576,9 @@ class InsultSystem(commands.Cog):
                     # Generate and send insult
                     insult = self.generate_insult(message.author.mention, data['tier'], message.guild.id)
                     
-                    # Create insult embed
-                    embed = discord.Embed(
-                        title="🎯 Triggered!",
-                        description=insult,
-                        color=COLORS['error']
-                    )
-                    embed.add_field(name="Trigger", value=trigger, inline=True)
-                    embed.add_field(name="Tier", value=data['tier'].title(), inline=True)
-                    embed.add_field(name="Count", value=f"#{data['trigger_count']}", inline=True)
-                    
-                    # Send the insult
+                    # Send the insult as plain text
                     try:
-                        await message.channel.send(embed=embed, delete_after=30)
+                        await message.channel.send(insult, delete_after=30)
                     except discord.Forbidden:
                         # Bot doesn't have permission to send messages
                         pass
