@@ -85,7 +85,7 @@ Use `!help` to see all available commands in Discord!
 - `!adminrolepanel` - Open the role management admin panel (Admin only)
 
 ### 🎯 Insult System Commands
-- `!insulton "trigger" @user [tier]` - Start tracking a phrase/emoji for a specific user (Admin only)
+- `!insulton "trigger" [tier] @user` - Start tracking a phrase/emoji for a specific user (Admin only)
 - `!insulton "trigger" [tier]` - Start tracking a phrase/emoji for everyone (Admin only)
 - `!insultoff "trigger"` - Stop tracking a trigger (Admin only)
 - `!listinsults` - List all active insult triggers (Admin only)
@@ -104,6 +104,7 @@ Use `!help` to see all available commands in Discord!
 - `!insultdebug [tier]` - Debug command to check available insults (Admin only)
 - `!getemojiformat <emoji>` - Get the correct format for tracking emojis
 - `!testinsulton <trigger> <user_or_tier> [tier]` - Test parameter parsing without setting up tracking
+- `!testtier <tier>` - Test tier validation directly
 
 ## File Structure
 

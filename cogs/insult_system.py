@@ -151,26 +151,14 @@ class InsultSystem(commands.Cog):
 
     @commands.command(name='insulton')
     @commands.has_permissions(manage_messages=True)
-    async def insult_on(self, ctx, trigger: str, user_or_tier, tier: str = None):
-        """Set up insult tracking for a phrase/emoji. Usage: !insulton "trigger" @user [tier] OR !insulton "trigger" [tier] for everyone"""
-        # Determine if second parameter is a user or tier
-        if isinstance(user_or_tier, discord.Member):
-            # Format: !insulton "trigger" @user [tier]
-            user = user_or_tier
-            if tier is None:
-                tier = 'mild'
-            elif tier.lower() not in ['mild', 'strong', 'cruel']:
-                await ctx.send("❌ Invalid tier! Use: mild, strong, or cruel")
-                return
-            print(f"DEBUG: User format detected - User: {user.name}, Tier: {tier}")
-        else:
-            # Format: !insulton "trigger" [tier] (for everyone)
-            user = None
-            tier = user_or_tier
-            if tier.lower() not in ['mild', 'strong', 'cruel']:
-                await ctx.send("❌ Invalid tier! Use: mild, strong, or cruel")
-                return
-            print(f"DEBUG: Everyone format detected - Tier: {tier}")
+    async def insult_on(self, ctx, trigger: str, tier: str, user: discord.Member = None):
+        """Set up insult tracking for a phrase/emoji. Usage: !insulton "trigger" [tier] [@user]"""
+        # Validate tier first
+        if tier.lower() not in ['mild', 'strong', 'cruel']:
+            await ctx.send("❌ Invalid tier! Use: mild, strong, or cruel")
+            return
+        
+        print(f"DEBUG: Parameters - trigger: {trigger}, tier: {tier}, user: {user}")
         
         guild_key = str(ctx.guild.id)
         if guild_key not in self.tracked_triggers:
@@ -542,7 +530,7 @@ class InsultSystem(commands.Cog):
         
         embed.add_field(
             name="🚀 Getting Started",
-            value="1. Use `!insulton \"phrase\" @user [tier]` to track a specific user\n2. Use `!insulton \"phrase\" [tier]` to track everyone\n3. The bot will automatically insult when the phrase is used\n4. Choose from: mild, strong, or cruel tiers",
+            value="1. Use `!insulton \"phrase\" [tier] @user` to track a specific user\n2. Use `!insulton \"phrase\" [tier]` to track everyone\n3. The bot will automatically insult when the phrase is used\n4. Choose from: mild, strong, or cruel tiers",
             inline=False
         )
         
@@ -596,7 +584,7 @@ class InsultSystem(commands.Cog):
         
         embed.add_field(
             name="🎯 Trigger Examples",
-            value="• `!insulton \"hello\" @user mild` - Track specific user\n• `!insulton \"hello\" mild` - Track everyone\n• `!insulton \"😀\" strong` - Track emoji for everyone",
+            value="• `!insulton \"hello\" mild @user` - Track specific user\n• `!insulton \"hello\" mild` - Track everyone\n• `!insulton \"😀\" strong` - Track emoji for everyone",
             inline=False
         )
         
@@ -719,7 +707,7 @@ class InsultSystem(commands.Cog):
                     break
 
     @commands.command(name='testinsulton')
-    async def test_insulton(self, ctx, trigger: str, user_or_tier, tier: str = None):
+    async def test_insulton(self, ctx, trigger: str, tier: str, user: discord.Member = None):
         """Test the insulton command parameter parsing without actually setting up tracking"""
         embed = discord.Embed(
             title="🧪 Insulton Parameter Test",
@@ -728,18 +716,43 @@ class InsultSystem(commands.Cog):
         )
         
         embed.add_field(name="Trigger", value=f"`{trigger}`", inline=True)
-        embed.add_field(name="Second Param", value=f"`{user_or_tier}`", inline=True)
-        embed.add_field(name="Third Param", value=f"`{tier}`", inline=True)
+        embed.add_field(name="Tier", value=f"`{tier}`", inline=True)
+        embed.add_field(name="User", value=f"`{user}`" if user else "`None (Everyone)`", inline=True)
         
-        # Determine if second parameter is a user or tier
-        if isinstance(user_or_tier, discord.Member):
+        # Show the format
+        if user:
             embed.add_field(name="Format Detected", value="User-specific tracking", inline=True)
-            embed.add_field(name="User", value=user_or_tier.mention, inline=True)
-            embed.add_field(name="Tier", value=tier or 'mild (default)', inline=True)
+            embed.add_field(name="Target", value=user.mention, inline=True)
         else:
             embed.add_field(name="Format Detected", value="Everyone tracking", inline=True)
-            embed.add_field(name="User", value="Everyone", inline=True)
-            embed.add_field(name="Tier", value=user_or_tier, inline=True)
+            embed.add_field(name="Target", value="Everyone", inline=True)
+        
+        embed.add_field(name="Command Format", value=f"`!insulton \"{trigger}\" {tier} {'@' + user.name if user else ''}`", inline=False)
+        
+        await ctx.send(embed=embed, delete_after=30)
+
+    @commands.command(name='testtier')
+    async def test_tier(self, ctx, tier: str):
+        """Test tier validation directly"""
+        valid_tiers = ['mild', 'strong', 'cruel']
+        tier_lower = tier.lower()
+        
+        embed = discord.Embed(
+            title="🧪 Tier Validation Test",
+            color=COLORS['info']
+        )
+        
+        embed.add_field(name="Input Tier", value=f"`{tier}`", inline=True)
+        embed.add_field(name="Lowercase", value=f"`{tier_lower}`", inline=True)
+        embed.add_field(name="Valid Tiers", value=f"`{valid_tiers}`", inline=True)
+        embed.add_field(name="Is Valid", value=f"`{tier_lower in valid_tiers}`", inline=True)
+        
+        if tier_lower in valid_tiers:
+            embed.color = COLORS['success']
+            embed.add_field(name="Result", value="✅ Valid tier!", inline=False)
+        else:
+            embed.color = COLORS['error']
+            embed.add_field(name="Result", value="❌ Invalid tier!", inline=False)
         
         await ctx.send(embed=embed, delete_after=30)
 
