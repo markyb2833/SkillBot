@@ -27,6 +27,14 @@ A feature-rich Discord bot with games, integrations, and a group finder system!
 - **Customizable Display** - Set custom labels and emojis for each role
 - **Role Name Input** - Add roles by typing their names instead of copying IDs
 
+### 🎯 Insult System
+- **Tiered Insults** - Mild, Strong, and Cruel insult levels
+- **Trigger Tracking** - Monitor specific phrases, words, or emojis
+- **Automatic Responses** - Bot automatically insults users when triggers are used
+- **Custom Insults** - Add your own insults to each tier
+- **API Integration** - Fallback to Evil Insult Generator API
+- **Trigger Statistics** - Track how many times each trigger has been activated
+
 ### 👥 Group Finder System
 - **Create Groups** (`!creategroup <activity> [max_size] [description]`)
 - **Join Groups** (`!joingroup <group_id>`)
@@ -76,6 +84,23 @@ Use `!help` to see all available commands in Discord!
 - `!listpanels` - List all panels and their display status (Admin only)
 - `!adminrolepanel` - Open the role management admin panel (Admin only)
 
+### 🎯 Insult System Commands
+- `!insulton "trigger" @user [tier]` - Start tracking a phrase/emoji for insult responses (Admin only)
+- `!insultoff "trigger"` - Stop tracking a trigger (Admin only)
+- `!listinsults` - List all active insult triggers (Admin only)
+- `!addinsult <tier> <text>` - Add a custom insult to a tier (Admin only)
+- `!removeinsult <tier> <index>` - Remove a custom insult by index (Admin only)
+- `!listcustominsults` - List all custom insults by tier (Admin only)
+- `!testinsult [tier] [@user]` - Test an insult of a specific tier (Admin only)
+
+#### **Default Insult Management (All Users)**
+- `!adddefaultinsult <tier> <text>` - Add an insult to the global default list (optional: include {user} tag)
+- `!removedefaultinsult <tier> <index>` - Remove a default insult by index
+- `!listdefaultinsults` - List all default insults by tier
+- `!resetdefaultinsults` - Reset to original insult list (Admin only)
+- `!insulthelp` - Show comprehensive help for the insult system
+- `!insultexamples` - Show examples of different insult formats
+
 ## File Structure
 
 ```
@@ -87,10 +112,13 @@ discord-bot/
 │   ├── games.py       # Game commands
 │   ├── group_finder.py # Group finder system
 │   ├── integrations.py # Fun integrations
-│   └── role_system.py # Role management system
+│   ├── role_system.py # Role management system
+│   └── insult_system.py # Insult system
 └── data/              # Data storage (auto-created)
     ├── groups.json    # Group data
-    └── role_system.json # Role system data
+    ├── role_system.json # Role system data
+    ├── insult_system.json # Insult system data
+    └── default_insults.json # Default insult database
 ```
 
 ## Customization
