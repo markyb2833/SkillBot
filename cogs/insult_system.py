@@ -578,7 +578,7 @@ class InsultSystem(commands.Cog):
                     
                     # Send the insult as plain text
                     try:
-                        await message.channel.send(insult, delete_after=30)
+                        await message.channel.send(insult)
                     except discord.Forbidden:
                         # Bot doesn't have permission to send messages
                         pass
